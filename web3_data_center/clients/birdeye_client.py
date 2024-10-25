@@ -264,3 +264,24 @@ class BirdeyeClient(BaseClient):
                 break
 
         return all_traders[:max_traders]
+    
+    async def get_token_price_at_time(self, token_address: str, time: int) -> Optional[TokenSecurity]:
+        """
+        Get the price of a token at a specific time.
+
+        Args:
+            token_address (str): The address of the token for which the price is requested.
+            time (int): The timestamp to get the price at.
+        Returns:
+            Optional[float]: The price at the given time, or None if the request fails or data is not available.
+        """
+        endpoint = f"/defi/history_price"
+        headers = {'x-chain': 'solana'}
+        params = {"address": token_address, "time": time}
+        response = await self._make_request(endpoint, params=params, headers=headers)
+        
+        if response and isinstance(response, dict) and 'data' in response:
+            data = response['data']
+            return data.get('close')
+        else:
+            return None

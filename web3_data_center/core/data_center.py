@@ -24,12 +24,13 @@ class DataCenter:
         # self.opensearch_client = OpenSearchClient(config_path=config_path)
         self.cache = {}
 
-    async def get_token_call_performance(self, address: str, called_time: datetime.datetime, chain: str = 'solana') -> Optional[Token]:
+    async def get_token_call_performance(self, address: str, called_time: datetime.datetime, chain: str = 'sol') -> Optional[Token]:
         price_history = await self.get_token_price_history(address, chain, resolution='1m', from_time=int(called_time.timestamp()), to_time=int(time.time()))
         # calculate drawdown and ath multiple since called_time
         # price at called_time
         # get correct place from price_history like: [{'open': '0.78457552178042790000', 'high': '0.78457552178042790000', 'low': '0.74969875041493808885', 'close': '0.76926061486827099588', 'volume': '327317.73133496651430000000', 'time': '1729776600000'}, {'open': '0.76926061486827099588', 'high': '0.77963204815911584348', 'low': '0.76476126987210720000', 'close': '0.77317198902943750000', 'volume': '280574.22261012006010000000', 'time': '1729776660000'},
         called_price = float(price_history[0]['close'])
+        # called_price = self.get_token_price_at_time(address, chain, called_time)
         logger.info(f"Called price: {called_price}")
         max_price = called_price
         max_price_timestamp = None
@@ -50,9 +51,18 @@ class DataCenter:
         ath_multiple = max_price / called_price
         return ath_multiple, drawdown
 
+    async def get_token_price_at_time(self, address: str, chain: str = 'sol') -> Optional[Token]:
+        cache_key = f"token_info:{chain}:{address}"
+        if cache_key in self.cache:
+            return self.cache[cache_key]
 
+        token = await self.birdeye_client.get_token_price_at_time(address, chain)
 
-    async def get_token_info(self, address: str, chain: str = 'solana') -> Optional[Token]:
+        if token:
+            self.cache[cache_key] = token
+        return token
+
+    async def get_token_info(self, address: str, chain: str = 'sol') -> Optional[Token]:
         cache_key = f"token_info:{chain}:{address}"
         if cache_key in self.cache:
             return self.cache[cache_key]
