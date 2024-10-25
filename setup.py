@@ -12,8 +12,7 @@ setup(
     author='Gmatrixuniverse',
     author_email='gmatrixuniverse@gmail.com',
     url='https://github.com/gmatrixuniverse/web3_data_center',
-    packages=find_packages(where='web3_data_center', exclude=['tests*']),
-    package_dir={'': 'web3_data_center'},
+    packages=find_packages(exclude=['tests*']),
     install_requires=[
         'asyncio',
         'aiohttp',
