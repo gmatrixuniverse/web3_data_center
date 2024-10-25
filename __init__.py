@@ -9,7 +9,7 @@ from web3_data_center.models.price_history_point import PriceHistoryPoint
 
 # Import utility functions that might be useful
 # You can also import and expose the version of your package
-__version__ = "0.1.6"
+__version__ = "0.1.7"
 
 # Define what gets imported when someone does `from web3_data_center import *`
 __all__ = [

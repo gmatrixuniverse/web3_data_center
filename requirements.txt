@@ -5,3 +5,7 @@ isort
 flake8
 mypy
 asyncpg
+beautifulsoup4
+lxml
+pytesseract
+opensearch-py

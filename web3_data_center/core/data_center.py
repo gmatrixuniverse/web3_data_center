@@ -25,8 +25,8 @@ class DataCenter:
         self.cache = {}
 
     async def get_token_call_performance(self, address: str, called_time: datetime.datetime, chain: str = 'sol') -> Optional[Token]:
+        symbol = (await self.get_token_info(address, chain)).symbol
         price_history = await self.get_token_price_history(address, chain, resolution='1m', from_time=int(called_time.timestamp()), to_time=int(time.time()))
-        # calculate drawdown and ath multiple since called_time
         # price at called_time
         # get correct place from price_history like: [{'open': '0.78457552178042790000', 'high': '0.78457552178042790000', 'low': '0.74969875041493808885', 'close': '0.76926061486827099588', 'volume': '327317.73133496651430000000', 'time': '1729776600000'}, {'open': '0.76926061486827099588', 'high': '0.77963204815911584348', 'low': '0.76476126987210720000', 'close': '0.77317198902943750000', 'volume': '280574.22261012006010000000', 'time': '1729776660000'},
         called_price = float(price_history[0]['close'])
@@ -48,8 +48,8 @@ class DataCenter:
                 min_price_timestamp = price_point['time']
         logger.info(f"Max price: {max_price}, Max price timestamp: {max_price_timestamp}, Min price: {min_price}, Min price timestamp: {min_price_timestamp}")
         drawdown = min_price / called_price - 1 if called_price > min_price else 0
-        ath_multiple = max_price / called_price
-        return ath_multiple, drawdown
+        ath_multiple = max_price / called_price - 1
+        return symbol, ath_multiple, drawdown
 
     async def get_token_price_at_time(self, address: str, chain: str = 'sol') -> Optional[Token]:
         cache_key = f"token_info:{chain}:{address}"
@@ -68,10 +68,15 @@ class DataCenter:
             return self.cache[cache_key]
 
         token = None
-        if chain == 'solana':
+        if chain == 'sol':
+            # print(f"Token from solscan:")
             token = await self.solscan_client.get_token_info(address)
             if not token:
                 token = await self.birdeye_client.get_token_info(address)
+                # print(f"Token from birdeye: {token}")
+            if not token:
+                token = await self.gmgn_client.get_token_info(address, chain)
+                # print(f"Token from gmgn: {token}")
         else:
             # Implement for other chains if needed
             pass
