@@ -1,0 +1,560 @@
+import re
+import aiohttp
+import asyncio
+from typing import Dict, List, Union, Set, Any
+from bs4 import BeautifulSoup
+from src.utils.logger import get_logger
+from urllib.parse import urljoin, urlparse
+import ssl
+from src.clients.twitter_monitor_client import TwitterMonitorClient
+
+
+logger = get_logger(__name__)
+
+class ContentExtractor:
+    @staticmethod
+    def _extract_eth_addresses(text: str) -> List[str]:
+        addresses = re.findall(r'\b0x[a-fA-F0-9]{40}\b', text, re.IGNORECASE)
+        logger.info(f"Extracted {len(addresses)} Ethereum addresses")
+        return list(set(address.lower() for address in addresses))
+
+    @staticmethod
+    def _extract_sol_addresses(text: str) -> List[str]:
+        addresses = re.findall(r'\b[1-9A-HJ-NP-Za-km-z]{32,44}\b', text)
+        logger.info(f"Extracted {len(addresses)} Solana addresses")
+        return list(set(addresses))
+
+    @staticmethod
+    def _extract_tickers(text: str) -> List[str]:
+        tickers = re.findall(r'\$[A-Za-z]{2,}', text)
+        logger.info(f"Extracted {len(tickers)} tickers")
+        return list(set(tickers))
+
+    @staticmethod
+    def _extract_websites(text: str) -> List[str]:
+        websites = re.findall(r'https?://(?:www\.)?[-a-zA-Z0-9@:%._\+~#=]{1,256}\.[a-zA-Z0-9()]{1,6}\b[-a-zA-Z0-9()@:%_\+.~#?&//=]*', text)
+        filtered_websites = []
+
+        excluded_domains = {'x.com', 'twitter.com'}
+
+        for website in websites:
+            parsed_url = urlparse(website)
+            if parsed_url.netloc not in excluded_domains:
+                filtered_websites.append(website)
+
+        logger.info(f"Extracted {len(filtered_websites)} websites")
+        return filtered_websites
+
+    @staticmethod
+    def _extract_handles(text: str) -> List[str]:
+        # Extract handles from @ mentions
+        handles = ['@' + handle for handle in re.findall(r'@([A-Za-z0-9_]+)', text)]
+        
+        # Extract handles from X/Twitter URLs
+        urls = re.findall(r'https?://(?:www\.)?(?:x\.com|twitter\.com)/([A-Za-z0-9_]+)(?:\?|/|$)', text)
+        handles.extend(['@' + handle for handle in urls if handle not in ['status', 'search']])
+        
+        # Remove duplicates and sort
+        handles = sorted(set(handles))
+        
+        logger.info(f"Extracted {len(handles)} handles")
+        return handles
+
+    @staticmethod
+    def _extract_tweets(text: str) -> List[str]:
+        tweet_ids = re.findall(r'https?://(?:www\.)?(?:x\.com|twitter\.com)/\w+/status/(\d+)', text)
+        logger.info(f"Extracted {len(tweet_ids)} tweet IDs")
+        return list(set(tweet_ids))
+# Above methods are fixed, won't change forever
+
+    async def extract_from_source(self, source: Any, depth: int = 1, visited: Set[str] = None) -> Dict[str, List[str]]:
+        if visited is None:
+            visited = set()
+
+        if depth <= 0:
+            return self._empty_result()
+
+        if isinstance(source, str):
+            if source.startswith('@'):
+                return await self._extract_from_handle(source, depth, visited)
+            elif source.startswith('http'):
+                return await self._extract_from_url(source, depth, visited)
+            else:
+                return await self._extract_from_text(source, depth, visited)
+        else:
+            # Assume it's tweet data
+            return await self._extract_from_tweet(source, depth, visited)
+
+
+
+    @staticmethod
+    async def extract_from_text(text: str, max_depth: int = 1) -> Dict[str, List[str]]:
+        logger.info(f"Extracting from text (max_depth: {max_depth})")
+        extracted_data = {
+            'eth_addresses': ContentExtractor._extract_eth_addresses(text),
+            'sol_addresses': ContentExtractor._extract_sol_addresses(text),
+            'tickers': ContentExtractor._extract_tickers(text),
+            'websites': ContentExtractor._extract_websites(text),
+            'handles': ContentExtractor._extract_handles(text),
+            'tweets': ContentExtractor._extract_tweets(text)
+        }
+        
+        if max_depth > 1:
+            await ContentExtractor._recursive_extract(extracted_data, max_depth - 1, set())
+        
+        logger.info(f"Extracted data: {extracted_data}")
+        return extracted_data
+
+    @classmethod
+    async def _recursive_extract(cls, data: Dict[str, List[str]], depth: int, visited: set):
+        if depth <= 0:
+            return
+
+        new_websites = set(data['websites']) - visited
+        new_handles = set(data['handles']) - visited
+        new_tweets = set(data['tweets']) - visited
+
+        for website in list(new_websites):
+            if website not in visited:
+                visited.add(website)
+                website_data = await cls.extract_from_url(website)
+                for key, values in website_data.items():
+                    data[key].extend(values)
+                new_websites.update(set(website_data['websites']) - visited)
+                new_handles.update(set(website_data['handles']) - visited)
+                new_tweets.update(set(website_data['tweets']) - visited)
+
+        for handle in list(new_handles):
+            if handle not in visited:
+                visited.add(handle)
+                handle_data = await cls.extract_from_handle(handle)
+                for key, values in handle_data.items():
+                    data[key].extend(values)
+                new_websites.update(set(handle_data['websites']) - visited)
+                new_handles.update(set(handle_data['handles']) - visited)
+                new_tweets.update(set(handle_data['tweets']) - visited)
+
+        for tweet in list(new_tweets):
+            if tweet not in visited:
+                visited.add(tweet)
+                tweet_data = await cls.extract_from_tweet(tweet)
+                for key, values in tweet_data.items():
+                    data[key].extend(values)
+                new_websites.update(set(tweet_data['websites']) - visited)
+                new_handles.update(set(tweet_data['handles']) - visited)
+                new_tweets.update(set(tweet_data['tweets']) - visited)
+
+        # Remove duplicates
+        for key in data:
+            data[key] = list(set(data[key]))
+
+        # Recursively extract from new websites, handles, and tweets
+        new_websites = new_websites - visited
+        new_handles = new_handles - visited
+        new_tweets = new_tweets - visited
+        if new_websites or new_handles or new_tweets:
+            new_data = {
+                'eth_addresses': [],
+                'sol_addresses': [],
+                'tickers': [],
+                'websites': list(new_websites),
+                'handles': list(new_handles),
+                'tweets': list(new_tweets)
+            }
+            await cls._recursive_extract(new_data, depth - 1, visited)
+            for key in data:
+                data[key].extend(new_data[key])
+                data[key] = list(set(data[key]))
+
+
+    @classmethod
+    async def extract_from_handle(cls, handle: str, depth: int = 2, timeout: int = 30) -> Dict[str, List[str]]:
+        logger.warning(f"Extracting from handle: {handle}")
+        try:
+            # Remove '@' if present
+            handle = handle.lstrip('@')
+
+            # Initialize TwitterMonitorClient
+            client = TwitterMonitorClient()
+
+            # Fetch user profile and tweets with timeout
+            async with asyncio.timeout(timeout):
+                user_data = await client.get_user_by_username(handle)
+                if not user_data:
+                    raise ValueError(f"User {handle} not found")
+
+                # Extract user ID
+                user_id = user_data.get('rest_id')
+                if not user_id:
+                    raise ValueError(f"Unable to get user ID for {handle}")
+
+                # Initialize result dictionary
+                result = cls._empty_extracted_data()
+
+                # Extract from user profile
+                expanded_url = user_data.get('legacy', {}).get('entities', {}).get('url', {}).get('urls', [{}])[0].get('expanded_url', '')
+                description = user_data.get('legacy', {}).get('description', '')
+                profile_text = f"{user_data.get('legacy', {}).get('name', '')} {description} {expanded_url}"
+                logger.warning(f"Extracting from profile text: {profile_text}")
+                profile_data = await cls.extract_from_text(profile_text, max_depth=1)
+                cls._merge_extracted_data(result, profile_data)
+
+                # Fetch pinned tweet and latest tweet concurrently
+                pinned_tweet_ids = user_data.get('legacy', {}).get('pinned_tweet_ids_str', [])
+                pinned_tweet_id = pinned_tweet_ids[0] if pinned_tweet_ids else None
+                pinned_tweet_task = client.get_tweet_by_rest_id(pinned_tweet_id) if pinned_tweet_id else None
+                latest_tweets_task = client.get_user_tweets(user_id, limit=1)
+
+                tweets_data = await asyncio.gather(
+                    pinned_tweet_task if pinned_tweet_task else asyncio.sleep(0),
+                    latest_tweets_task,
+                    return_exceptions=True
+                )
+
+                # Process pinned tweet
+                if tweets_data[0] and not isinstance(tweets_data[0], Exception) and tweets_data[0] is not None:
+                    logger.warning(f"Extracting from pinned tweet: {tweets_data[0].get('full_text', '')}")
+                    pinned_tweet_data = await cls.extract_from_text(tweets_data[0].get('full_text', ''), max_depth=1)
+                    cls._merge_extracted_data(result, pinned_tweet_data)
+
+                # Process latest tweet
+                if tweets_data[1] and not isinstance(tweets_data[1], Exception) and tweets_data[1]:
+                    latest_tweets = tweets_data[1]
+                    if isinstance(latest_tweets, list) and latest_tweets:
+                        latest_tweet = latest_tweets[0]
+                        if latest_tweet and latest_tweet.get('rest_id') != pinned_tweet_id:
+                            logger.warning(f"Extracting from latest tweet: {latest_tweet.get('full_text', '')}")
+                            latest_tweet_data = await cls.extract_from_text(latest_tweet.get('full_text', ''), max_depth=1)
+                            cls._merge_extracted_data(result, latest_tweet_data)
+                    else:
+                        logger.warning(f"No latest tweets found for {handle}")
+
+                # Recursive extraction from websites and handles
+                if depth > 1:
+                    new_websites = set(result['websites'])
+                    new_handles = set(result['handles'])
+                    new_tweets = set()  # Initialize new_tweets as an empty set
+                    visited = set()
+
+                    while new_websites or new_handles or new_tweets:
+                        current_websites = new_websites - visited
+                        current_handles = new_handles - visited
+                        current_tweets = new_tweets - visited
+
+                        for website in current_websites:
+                            website_data = await cls.extract_from_url(website)
+                            cls._merge_extracted_data(result, website_data)
+                            visited.add(website)
+
+                        for handle in current_handles:
+                            handle_data = await cls.extract_from_handle(handle, depth=depth-1, timeout=timeout)
+                            cls._merge_extracted_data(result, handle_data)
+                            visited.add(handle)
+
+                        for tweet in current_tweets:
+                            tweet_data = await cls.extract_from_tweet(tweet)
+                            cls._merge_extracted_data(result, tweet_data)
+                            visited.add(tweet)
+
+                        new_websites = set(result['websites']) - visited
+                        new_handles = set(result['handles']) - visited
+                        new_tweets = set()  # Reset new_tweets to an empty set
+
+                logger.info(f"Extracted data from handle {handle}: {result}")
+                return result
+        except asyncio.TimeoutError:
+            logger.error(f"Timeout error extracting from handle {handle}")
+        except Exception as e:
+            logger.error(f"Error extracting from handle {handle}: {str(e)}")
+            logger.exception("Full traceback:")
+        
+        return cls._empty_extracted_data()
+
+    @staticmethod
+    def _merge_extracted_data(target: Dict[str, List[str]], source: Dict[str, List[str]]):
+        for key in target:
+            target[key].extend(source[key])
+            target[key] = list(set(target[key]))
+
+    @classmethod
+    async def extract_from_url(cls, url: str) -> Dict[str, List[str]]:
+        logger.info(f"Extracting from URL: {url}")
+        try:
+            ssl_context = ssl.create_default_context()
+            ssl_context.check_hostname = False
+            ssl_context.verify_mode = ssl.CERT_NONE
+            
+            proxy = "http://127.0.0.1:7890"
+            
+            async with aiohttp.ClientSession() as session:
+                async with session.get(url, ssl=ssl_context, timeout=30, proxy=proxy) as response:
+                    html_content = await response.text()
+
+            soup = BeautifulSoup(html_content, 'html.parser')
+            text_content = soup.get_text()
+            extracted_data = await cls.extract_from_text(text_content)
+
+            # Extract links as strings and resolve relative URLs
+            links = []
+            for a in soup.find_all('a', href=True):
+                href = a['href']
+                full_url = urljoin(url, href)
+                links.append(full_url)
+
+            # Extract iframe sources as strings
+            for iframe in soup.find_all('iframe', src=True):
+                iframe_url = urljoin(url, iframe['src'])
+                links.append(iframe_url)
+
+            # Extract data from embedded links without requesting them
+            embedded_text = ' '.join(links)
+            embedded_data = await cls.extract_from_text(embedded_text)
+
+            # Merge extracted data
+            for key in extracted_data:
+                if key != 'websites':
+                    extracted_data[key].extend(embedded_data[key])
+
+            # Add extracted links to the websites list
+            extracted_data['websites'].extend(links)
+
+            # Remove duplicates and return
+            for key in extracted_data:
+                extracted_data[key] = list(set(extracted_data[key]))
+
+            logger.info(f"Extracted data from URL {url}: {extracted_data}")
+            return extracted_data
+        except asyncio.TimeoutError:
+            logger.error(f"Timeout error extracting from URL {url}")
+        except Exception as e:
+            logger.error(f"Error extracting from URL {url}: {str(e)}")
+        
+        return cls._empty_extracted_data()
+
+    @classmethod
+    async def extract_from_image(cls, image_data: bytes) -> Dict[str, List[str]]:
+        logger.info("Extracting from image")
+        try:
+            import pytesseract
+            from PIL import Image
+            import io
+
+            # Convert image data to PIL Image
+            image = Image.open(io.BytesIO(image_data))
+
+            # Perform OCR directly on the image
+            text = pytesseract.image_to_string(image)
+
+            print(text)
+            # Extract information from the OCR result
+            extracted_data = await cls.extract_from_text(text)
+
+            logger.info(f"Extracted data from image: {extracted_data}")
+            return extracted_data
+        except Exception as e:
+            logger.error(f"Error extracting from image: {str(e)}")
+            return cls._empty_extracted_data()
+
+    @classmethod
+    async def extract_from_multiple_images(cls, images_data: List[bytes]) -> Dict[str, List[str]]:
+        logger.info(f"Extracting from {len(images_data)} images")
+        tasks = [cls.extract_from_image(image_data) for image_data in images_data]
+        results = await asyncio.gather(*tasks)
+
+        combined_data = {
+            'eth_addresses': [],
+            'sol_addresses': [],
+            'tickers': [],
+            'websites': [],
+            'handles': []
+        }
+
+        for result in results:
+            for key in combined_data:
+                combined_data[key].extend(result[key])
+
+        # Remove duplicates
+        for key in combined_data:
+            combined_data[key] = list(set(combined_data[key]))
+
+        logger.info(f"Extracted data from multiple images: {combined_data}")
+        return combined_data
+
+    @classmethod
+    async def extract_from_image_url(cls, image_url: str) -> Dict[str, List[str]]:
+        logger.info(f"Extracting from image URL: {image_url}")
+        try:
+            proxy = "http://127.0.0.1:7890"
+            async with aiohttp.ClientSession() as session:
+                async with session.get(image_url, proxy=proxy) as response:
+                    if response.status == 200:
+                        image_data = await response.read()
+                        extracted_data = await cls.extract_from_image(image_data)
+                        logger.info(f"Extracted data from image URL {image_url}: {extracted_data}")
+                        return extracted_data
+                    else:
+                        logger.error(f"Failed to fetch image from {image_url}. Status: {response.status}")
+                        return cls._empty_extracted_data()
+        except Exception as e:
+            logger.error(f"Error fetching image from {image_url}: {str(e)}")
+            return cls._empty_extracted_data()
+
+    @classmethod
+    async def extract_from_multiple_image_urls(cls, image_urls: List[str]) -> Dict[str, List[str]]:
+        logger.info(f"Extracting from {len(image_urls)} image URLs")
+        tasks = [cls.extract_from_image_url(url) for url in image_urls]
+        results = await asyncio.gather(*tasks)
+
+        combined_data = cls._empty_extracted_data()
+        for result in results:
+            for key in combined_data:
+                combined_data[key].extend(result[key])
+
+        # Remove duplicates
+        for key in combined_data:
+            combined_data[key] = list(set(combined_data[key]))
+
+        logger.info(f"Extracted data from multiple image URLs: {combined_data}")
+        return combined_data
+
+    @classmethod
+    async def extract_from_tweet(cls, tweet_data: Dict[str, Any], depth: int = 2, twitter_client=None) -> Dict[str, List[str]]:
+        logger.info(f"Extracting from tweet with depth {depth}")
+        extracted_data = cls._empty_extracted_data()
+        processed_tweets = set()
+        processed_handles = set()
+        processed_websites = set()
+
+        async def process_single_tweet(tweet, current_depth):
+            tweet_id = tweet.get('rest_id') or tweet.get('id_str') or tweet.get('id')
+            if tweet_id in processed_tweets:
+                return
+            processed_tweets.add(tweet_id)
+
+            # Extract pic links and fetch images
+            pic_links = tweet.get('pic_links', [])
+            images_extracted = await cls.extract_from_multiple_image_urls(pic_links)
+            cls._merge_extracted_data(extracted_data, images_extracted)
+
+            # Combine tweet text, websites, and handles for extraction
+            combined_text = tweet.get('full_text', '')
+            websites = tweet.get('websites', [])
+            handles = tweet.get('handles', [])
+            combined_text += ' ' + ' '.join(websites) + ' ' + ' '.join(handles)
+
+            # Extract from combined text
+            text_extracted = await cls.extract_from_text(combined_text)
+            cls._merge_extracted_data(extracted_data, text_extracted)
+
+            # Add websites and handles directly
+            extracted_data['websites'].extend(websites)
+            extracted_data['handles'].extend(handles)
+
+            # Process replied tweet if depth allows
+            if current_depth < depth and tweet.get('replied_to_id'):
+                replied_tweet = await cls.get_replied_tweet(tweet['replied_to_id'], twitter_client)
+                if replied_tweet:
+                    await process_single_tweet(replied_tweet, current_depth + 1)
+
+        await process_single_tweet(tweet_data, 1)
+
+        # Process related handles
+        if depth > 1:
+            for handle in extracted_data['handles']:
+                if handle not in processed_handles:
+                    processed_handles.add(handle)
+                    handle_data = await cls.extract_from_handle(handle, depth=depth-1, twitter_client=twitter_client)
+                    cls._merge_extracted_data(extracted_data, handle_data)
+
+        # Process websites
+        if depth > 1:
+            new_websites = [url for url in extracted_data['websites'] if url not in processed_websites]
+            if new_websites:
+                processed_websites.update(new_websites)
+                website_data = await cls.extract_from_multiple_urls(new_websites)
+                cls._merge_extracted_data(extracted_data, website_data)
+
+        logger.info(f"Extracted data from tweet and related content: {extracted_data}")
+        return extracted_data
+
+    @classmethod
+    async def get_replied_tweet(cls, replied_tweet_id: str, twitter_client) -> Dict[str, Any]:
+        if twitter_client:
+            return await twitter_client.get_tweet_by_rest_id(replied_tweet_id)
+        return None
+
+    @classmethod
+    def _empty_extracted_data(cls) -> Dict[str, List[str]]:
+        return {
+            'eth_addresses': [],
+            'sol_addresses': [],
+            'tickers': [],
+            'websites': [],
+            'handles': []
+        }
+
+    @classmethod
+    async def process_x_post(cls, twitter_client, post_id: str) -> Dict[str, List[str]]:
+        logger.info(f"Processing X post with ID: {post_id}")
+        # Fetch the tweet using TwitterMonitorClient
+        tweet_data = await twitter_client.get_tweet_by_rest_id(post_id)
+        
+        if tweet_data:
+            # Extract data from the fetched tweet
+            extracted_data = await cls.extract_from_tweet(tweet_data, twitter_client=twitter_client)
+            
+            for potential_address in extracted_data['sol_addresses']:
+                if cls.is_valid_solana_address(potential_address):
+                    logger.info(f"Solana address found in X post: {potential_address}")
+
+            logger.info(f"Extracted data from X post {post_id}: {extracted_data}")
+            return extracted_data
+        else:
+            logger.error(f"Failed to fetch tweet with ID: {post_id}")
+            return cls._empty_extracted_data()
+
+    @staticmethod
+    def is_valid_solana_address(address: str) -> bool:
+        # This is a basic check. You might want to implement a more robust validation.
+        return bool(re.match(r'^[1-9A-HJ-NP-Za-km-z]{32,44}$', address))
+
+    @staticmethod
+    def _html_to_text(html_content: str) -> str:
+        soup = BeautifulSoup(html_content, 'html.parser')
+        return soup.get_text()
+
+    @classmethod
+    async def extract_from_urls_with_depth(cls, urls, depth=1):
+        extracted_data = await cls.extract_from_multiple_urls(urls)
+        all_links = set(extracted_data['websites'])
+        
+        for _ in range(depth - 1):
+            new_urls = [url for url in all_links if url not in urls]
+            if new_urls:
+                additional_data = await cls.extract_from_multiple_urls(new_urls)
+                for key in extracted_data:
+                    extracted_data[key].extend(additional_data[key])
+                all_links.update(additional_data['websites'])
+            urls.extend(new_urls)
+
+        return extracted_data, list(all_links)
+
+    @classmethod
+    async def extract_from_multiple_urls(cls, urls: List[str]) -> Dict[str, List[str]]:
+        tasks = [cls.extract_from_url(url) for url in urls]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        
+        combined_data = cls._empty_extracted_data()
+        
+        for result in results:
+            if isinstance(result, dict):
+                for key in combined_data:
+                    combined_data[key].extend(result[key])
+            else:
+                logger.error(f"Error in extracting from URL: {str(result)}")
+        
+        # Remove duplicates
+        for key in combined_data:
+            combined_data[key] = list(set(combined_data[key]))
+        
+        return combined_data
