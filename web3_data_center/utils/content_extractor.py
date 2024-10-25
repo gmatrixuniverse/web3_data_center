@@ -6,8 +6,8 @@ from bs4 import BeautifulSoup
 from enum import Enum, auto
 from urllib.parse import urljoin, urlparse, parse_qs
 import ssl
-from src.clients.twitter_monitor_client import TwitterMonitorClient
-from src.models.source import Source, SourceType
+from web3_data_center.clients.twitter_monitor_client import TwitterMonitorClient
+from web3_data_center.models.source import Source, SourceType
 import pytesseract
 from PIL import Image
 import io

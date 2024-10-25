@@ -4,7 +4,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import asyncio
 import unittest
-from src.clients.opensearch_client import OpenSearchClient
+from web3_data_center.clients.opensearch_client import OpenSearchClient
 
 # ... rest of the test code remains the same ...
 

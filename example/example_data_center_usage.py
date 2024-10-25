@@ -5,8 +5,8 @@ import os
 # Add the project root directory to the Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from src.core.data_center import DataCenter
-from src.utils.logger import get_logger
+from web3_data_center.core.data_center import DataCenter
+from web3_data_center.utils.logger import get_logger
 import datetime
 
 logger = get_logger(__name__)

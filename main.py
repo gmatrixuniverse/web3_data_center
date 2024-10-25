@@ -1,8 +1,8 @@
 import asyncio
-from src.clients.opensearch_client import OpenSearchClient
-from src.core.data_center import DataCenter
-from src.utils.logger import get_logger
-from src.utils.database import Database
+from web3_data_center.clients.opensearch_client import OpenSearchClient
+from web3_data_center.core.data_center import DataCenter
+from web3_data_center.utils.logger import get_logger
+from web3_data_center.utils.database import Database
 import traceback
 import time
 from tqdm import tqdm
