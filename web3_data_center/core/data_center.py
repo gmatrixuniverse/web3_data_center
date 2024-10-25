@@ -8,7 +8,6 @@ from ..clients.opensearch_client import OpenSearchClient
 from ..models.token import Token
 from ..models.holder import Holder
 from ..models.price_history_point import PriceHistoryPoint
-from ..utils.config_loader import CONFIG
 from ..utils.logger import get_logger
 import time
 import datetime

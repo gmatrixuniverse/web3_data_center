@@ -10,7 +10,6 @@ from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_excep
 from opensearchpy import OpenSearch, RequestError, TransportError
 
 from .base_client import BaseClient
-from ..utils.config_loader import CONFIG
 
 logger = logging.getLogger(__name__)
 

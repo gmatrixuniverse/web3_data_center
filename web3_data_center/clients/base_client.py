@@ -9,7 +9,6 @@ import asyncio
 import requests
 import time
 from typing import Dict, Any, Optional
-from ..utils.config_loader import CONFIG
 import logging
 import json
 
@@ -43,7 +42,7 @@ class RateLimiter:
 
 
 class BaseClient:
-    rate_limiter = RateLimiter(CONFIG.get('global', {}).get('rate_limit', 20))
+    rate_limiter = RateLimiter(20)
 
     def __init__(self, api_name: str, config_path: str = "config.yml", credentials_source: str = "config", api_key_env: Optional[str] = None, use_proxy: bool = False, use_zenrows: bool = False):
         self.config = self.load_config(config_path)
