@@ -8,8 +8,6 @@ from web3_data_center.models.transaction import Transaction
 from web3_data_center.models.price_history_point import PriceHistoryPoint
 
 # Import utility functions that might be useful
-from web3_data_center.utils.config_loader import load_config
-
 # You can also import and expose the version of your package
 __version__ = "0.1.5"
 
@@ -19,8 +17,7 @@ __all__ = [
     'Token',
     'Holder',
     'Transaction',
-    'PriceHistoryPoint',
-    'load_config'
+    'PriceHistoryPoint'
 ]
 
 # You can also include a brief description of your package
