@@ -11,7 +11,7 @@ from web3_data_center.models.price_history_point import PriceHistoryPoint
 from web3_data_center.utils.config_loader import load_config
 
 # You can also import and expose the version of your package
-__version__ = "0.1.4"
+__version__ = "0.1.5"
 
 # Define what gets imported when someone does `from web3_data_center import *`
 __all__ = [
