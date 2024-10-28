@@ -8,7 +8,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from web3_data_center.core.data_center import DataCenter
 from web3_data_center.utils.logger import get_logger
 import datetime
-
+import pandas as pd
 logger = get_logger(__name__)
 
 async def main():
@@ -17,14 +17,19 @@ async def main():
 
     try:
         # Example 1: Get token info
-        token_address = "CzLSujWBLFsSjncfkh59rUFqvafWcY5tzedWJSuypump"  # Wrapped SOL
-        token_info = await data_center.get_token_info(token_address)
+        # token_address = "CzLSujWBLFsSjncfkh59rUFqvafWcY5tzedWJSuypump"  # Wrapped SOL
+        # token_info = await data_center.get_token_info(token_address)
         # logger.info(f"Token Info: {token_info}")
 
         # Example 2: Get price history
-        symbol, ath, drawdown = await data_center.get_token_call_performance(token_address, chain='sol', called_time=datetime.datetime.now() - datetime.timedelta(hours=3))
+        # symbol, ath, drawdown = await data_center.get_token_call_performance(token_address, chain='sol', called_time=datetime.datetime.now() - datetime.timedelta(hours=3))
         # logger.info(f"Token: {symbol}, ATH: {ath}, Drawdown: {drawdown}")
-
+        df = pd.read_csv('tokens.csv')
+        tokens = df['token_address'].tolist()
+        results = await data_center.check_tokens_safe(tokens, chain='eth')
+        false_count = results.count(False)
+        false_percentage = (false_count / len(results)) * 100
+        print(f"Percentage of unsafe tokens: {false_percentage:.2f}%")
         # # Example 3: Get top holders
         # top_holders = await data_center.get_top_holders(token_address, limit=10)
         # logger.info(f"Top 5 Holders: {top_holders}")

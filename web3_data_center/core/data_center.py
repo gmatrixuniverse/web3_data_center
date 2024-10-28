@@ -4,6 +4,7 @@ from ..clients.geckoterminal_client import GeckoTerminalClient
 from ..clients.gmgn_api_client import GMGNAPIClient
 from ..clients.birdeye_client import BirdeyeClient
 from ..clients.solscan_client import SolscanClient
+from ..clients.goplus_client import GoPlusClient
 from ..clients.opensearch_client import OpenSearchClient
 from ..models.token import Token
 from ..models.holder import Holder
@@ -21,6 +22,7 @@ class DataCenter:
         self.gmgn_client = GMGNAPIClient(config_path=config_path)
         self.birdeye_client = BirdeyeClient(config_path=config_path)
         self.solscan_client = SolscanClient(config_path=config_path)
+        self.goplus_client = GoPlusClient(config_path=config_path)
         # self.opensearch_client = OpenSearchClient(config_path=config_path)
         self.cache = {}
 
@@ -253,3 +255,16 @@ class DataCenter:
         except Exception as e:
             logger.error(f"Error fetching transactions: {str(e)}")
             yield []
+
+    async def get_token_security(self, address: str, chain: str = 'sol') -> Optional[Dict[str, Any]]:
+        cache_key = f"token_security:{chain}:{address}"
+        if cache_key in self.cache:
+            return self.cache[cache_key]
+
+        token_security = await self.goplus_client.get_tokens_security([address], chain)[0]
+        self.cache[cache_key] = token_security
+        return token_security
+
+    async def check_tokens_safe(self, address_list: List[str], chain: str = 'sol') -> List[bool]:
+        chain_obj = get_chain_info(chain)
+        return await self.goplus_client.check_tokens_safe(chain_id=chain_obj.chainId, token_address_list=address_list)

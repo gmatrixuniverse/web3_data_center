@@ -16,10 +16,10 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 class RateLimiter:
-    def __init__(self, rate_limit: int, time_period: float = 1.0):
-        self.rate_limit = rate_limit
-        self.time_period = time_period
-        self.tokens = rate_limit
+    def __init__(self, rpm: int = 120):
+        self.rate_limit = rpm
+        self.time_period = 60.0  # 1 minute in seconds
+        self.tokens = rpm
         self.updated_at = asyncio.get_event_loop().time()
         self.lock = asyncio.Lock()
 
@@ -40,9 +40,7 @@ class RateLimiter:
             else:
                 self.tokens -= 1
 
-
 class BaseClient:
-    rate_limiter = RateLimiter(20)
 
     def __init__(self, api_name: str, config_path: str = "config.yml", credentials_source: str = "config", api_key_env: Optional[str] = None, use_proxy: bool = False, use_zenrows: bool = False):
         self.config = self.load_config(config_path)
@@ -54,6 +52,9 @@ class BaseClient:
         self.zenrows_api_key = self.config['zenrows']['api_key'] if use_zenrows else None
         self.proxy = 'http://127.0.0.1:7890' if use_proxy else None
         self.headers = self._set_auth_headers()
+        rpm = self.config['api'][api_name].get('rpm', 120)  # Default to 120 RPM if not specified
+        self.rate_limiter = RateLimiter(rpm)
+        self.semaphore = asyncio.Semaphore(self.config['api'][api_name].get('max_concurrent', 5))
 
     def load_config(self, config_path: str) -> Dict[str, Any]:
         try:
@@ -149,7 +150,6 @@ class BaseClient:
 
         async with aiohttp.ClientSession(timeout=ClientTimeout(total=timeout)) as session:
             try:
-                await BaseClient.rate_limiter.acquire()
                 async with session.request(
                     method=method.upper(),
                     url=url,
@@ -196,6 +196,49 @@ class BaseClient:
         except json.JSONDecodeError as e:
             logging.error(f"Failed to decode JSON response: {str(e)}")
             raise
+
+    async def _make_concurrent_requests(
+        self,
+        requests: list[tuple[str, dict]],  # List of (endpoint, params) tuples
+        method: str = "GET",
+        timeout: int = 30
+    ) -> list[Dict[str, Any]]:
+        """
+        Make multiple requests concurrently while respecting rate limits.
+        
+        Args:
+            requests: List of (endpoint, params) tuples
+            method: HTTP method to use
+            timeout: Request timeout in seconds
+            
+        Returns:
+            List of API responses in the same order as the input requests
+        """
+        async def _rate_limited_request(endpoint: str, params: dict) -> Dict[str, Any]:
+            async with self.semaphore:  # Limit concurrent requests
+                await self.rate_limiter.acquire()  # Respect rate limits
+                return await self._make_request(
+                    endpoint=endpoint,
+                    method=method,
+                    params=params,
+                    timeout=timeout
+                )
+        
+        tasks = [
+            _rate_limited_request(endpoint, params)
+            for endpoint, params in requests
+        ]
+        
+        results = []
+        for task in asyncio.as_completed(tasks):
+            try:
+                result = await task
+                results.append(result)
+            except Exception as e:
+                logger.error(f"Request failed: {str(e)}")
+                results.append(e)
+                
+        return results
 
 # Example config.yml structure
 """
