@@ -5,6 +5,7 @@ import json
 from functools import lru_cache
 import asyncio
 import logging
+from chain_index import get_chain_info
 
 from .base_client import BaseClient
 from ..models.token import Token
@@ -141,10 +142,26 @@ class GMGNAPIClient(BaseClient):
         return response.get('data') if response else None
 
     async def get_token_info(self, token_address: str, chain: str = 'sol') -> Optional[Dict[str, Any]]:
-        chain = 'sol' if chain == 'solana' else chain
-        endpoint = f"/tokens/{chain}/{token_address}"
+        chain_info = get_chain_info(chain)
+        chain_slug = chain_info.shortName
+        endpoint = f"/tokens/{chain_slug}/{token_address}"
         response = await self._make_request(endpoint)
-        return response.get('data', {}).get('token', {}) if response and "data" in response else None
+        if not response or "data" not in response:
+            return None
+            
+        token_data = response.get('data', {}).get('token', {})
+        if not token_data:
+            return None
+            
+        return Token(
+            address=token_data.get('address'),
+            name=token_data.get('name'),
+            symbol=token_data.get('symbol'),
+            decimals=token_data.get('decimals'),
+            total_supply=token_data.get('total_supply'),
+            holder_count=token_data.get('holder_count'),
+            chain=chain
+        )
 
     async def get_wallet_holdings(self, wallet_address: str, chain: str = 'sol', order_by: str = 'last_active_timestamp', direction: str = 'desc', show_small: bool = True, sellout: bool = True, limit: int = 50, tx30d: bool = True) -> Optional[List[Dict[str, Any]]]:
         chain = 'sol' if chain == 'solana' else chain
