@@ -27,12 +27,12 @@ class DataCenter:
         self.cache = {}
 
     async def get_token_call_performance(self, address: str, called_time: datetime.datetime, chain: str = 'sol') -> Optional[Token]:
-        symbol = (await self.get_token_info(address, chain)).symbol
+        info = (await self.get_token_info(address, chain))
+        # logger.info(f"Got token info for {address} on {chain}: {info}")
+        symbol = info.symbol
         price_history = await self.get_token_price_history(address, chain, resolution='1m', from_time=int(called_time.timestamp()), to_time=int(time.time()))
         # price at called_time
-        # get correct place from price_history like: [{'open': '0.78457552178042790000', 'high': '0.78457552178042790000', 'low': '0.74969875041493808885', 'close': '0.76926061486827099588', 'volume': '327317.73133496651430000000', 'time': '1729776600000'}, {'open': '0.76926061486827099588', 'high': '0.77963204815911584348', 'low': '0.76476126987210720000', 'close': '0.77317198902943750000', 'volume': '280574.22261012006010000000', 'time': '1729776660000'},
         called_price = float(price_history[0]['close'])
-        # called_price = self.get_token_price_at_time(address, chain, called_time)
         logger.info(f"Called price: {called_price}")
         max_price = called_price
         max_price_timestamp = None
@@ -64,13 +64,14 @@ class DataCenter:
             self.cache[cache_key] = token
         return token
 
-    async def get_token_info(self, address: str, chain: str = 'sol') -> Optional[Token]:
+    async def get_token_info(self, address: str, chain: str = 'solana') -> Optional[Token]:
         cache_key = f"token_info:{chain}:{address}"
         if cache_key in self.cache:
             return self.cache[cache_key]
 
         token = None
-        if chain == 'sol':
+        chaininfo = get_chain_info(chain)
+        if chaininfo.chainId == -1:
             # print(f"Token from solscan:")
             token = await self.solscan_client.get_token_info(address)
             if not token:
@@ -79,7 +80,8 @@ class DataCenter:
             if not token:
                 token = await self.gmgn_client.get_token_info(address, chain)
                 # print(f"Token from gmgn: {token}")
-        else:
+        elif chaininfo.chainId == 1:
+            token = await self.gmgn_client.get_token_info(address, chain)
             # Implement for other chains if needed
             pass
 
