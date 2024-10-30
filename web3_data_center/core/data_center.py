@@ -6,6 +6,7 @@ from ..clients.birdeye_client import BirdeyeClient
 from ..clients.solscan_client import SolscanClient
 from ..clients.goplus_client import GoPlusClient
 from ..clients.opensearch_client import OpenSearchClient
+from ..clients.chainbase_client import ChainbaseClient
 from ..models.token import Token
 from ..models.holder import Holder
 from ..models.price_history_point import PriceHistoryPoint
@@ -23,6 +24,7 @@ class DataCenter:
         self.birdeye_client = BirdeyeClient(config_path=config_path)
         self.solscan_client = SolscanClient(config_path=config_path)
         self.goplus_client = GoPlusClient(config_path=config_path)
+        self.chainbase_client = ChainbaseClient(config_path=config_path)
         # self.opensearch_client = OpenSearchClient(config_path=config_path)
         self.cache = {}
 
@@ -170,6 +172,64 @@ class DataCenter:
         wallet_data = await self.gmgn_client.get_wallet_data(address, chain, period)
         self.cache[cache_key] = wallet_data
         return wallet_data
+
+    async def get_deployed_contracts(self, address: str, chain: str = 'sol') -> Optional[List[Dict[str, Any]]]:
+        cache_key = f"deployed_contracts:{chain}:{address}"
+        if cache_key in self.cache:
+            return self.cache[cache_key]
+        chain_obj = get_chain_info(chain)
+        try:
+            response = await self.chainbase_client.query({
+                "query":f"SELECT contract_address\nFROM {chain_obj.icon}.transactions\nWHERE from_address = '{address}'\nAND to_address = ''"
+            })
+            if response and 'data' in response:
+                # Extract contract addresses from the result
+                deployed_contracts = [
+                    row['contract_address'] 
+                    for row in response['data'].get('result', [])
+                ]
+                self.cache[cache_key] = deployed_contracts
+                return deployed_contracts
+            return []
+        except Exception as e:
+            logger.error(f"Error fetching deployed contracts: {str(e)}")
+            return []
+
+    async def get_contract_user_count(self, address: str, chain: str = 'sol') -> Optional[Dict[str, Any]]:
+        cache_key = f"contract_user_count:{chain}:{address}"
+        if cache_key in self.cache:
+            return self.cache[cache_key]
+        chain_obj = get_chain_info(chain)
+        try:
+            response = await self.chainbase_client.query({
+                "query":f"SELECT COUNT(from_address)\nFROM {chain_obj.icon}.transactions\nWHERE to_address = '{address}'"
+            })
+            if response and 'data' in response:
+                user_count = response['data']['result'][0]['COUNT(from_address)']
+                self.cache[cache_key] = user_count
+                return user_count
+            return 0
+        except Exception as e:
+            logger.error(f"Error fetching contract user count: {str(e)}")
+            return 0
+        
+    async def get_contract_tx_count(self, address: str, chain: str = 'sol') -> Optional[Dict[str, Any]]:
+        cache_key = f"contract_tx_count:{chain}:{address}"
+        if cache_key in self.cache:
+            return self.cache[cache_key]
+        chain_obj = get_chain_info(chain)
+        try:
+            response = await self.chainbase_client.query({
+                "query":f"SELECT COUNT(*)\nFROM {chain_obj.icon}.transactions\nWHERE to_address = '{address}'"
+            })
+            if response and 'data' in response:
+                tx_count = response['data']['result'][0]['COUNT(*)']
+                self.cache[cache_key] = tx_count
+                return tx_count
+            return 0
+        except Exception as e:
+            logger.error(f"Error fetching contract tx count: {str(e)}")
+            return 0
 
     def clear_cache(self):
         self.cache.clear()

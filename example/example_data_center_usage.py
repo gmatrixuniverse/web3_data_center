@@ -24,12 +24,18 @@ async def main():
         # Example 2: Get price history
         # symbol, ath, drawdown = await data_center.get_token_call_performance(token_address, chain='sol', called_time=datetime.datetime.now() - datetime.timedelta(hours=3))
         # logger.info(f"Token: {symbol}, ATH: {ath}, Drawdown: {drawdown}")
-        df = pd.read_csv('tokens.csv')
-        tokens = df['token_address'].tolist()
-        results = await data_center.check_tokens_safe(tokens, chain='eth')
-        false_count = results.count(False)
-        false_percentage = (false_count / len(results)) * 100
-        print(f"Percentage of unsafe tokens: {false_percentage:.2f}%")
+        # df = pd.read_csv('tokens.csv')
+        # tokens = df['token_address'].tolist()
+        # results = await data_center.check_tokens_safe(tokens, chain='eth')
+        # false_count = results.count(False)
+        # false_percentage = (false_count / len(results)) * 100
+        # print(f"Percentage of unsafe tokens: {false_percentage:.2f}%")
+        deployed_contracts = await data_center.get_deployed_contracts(address="0x37aAb97476bA8dC785476611006fD5dDA4eed66B", chain='ethereum')
+        logger.info(f"Deployed Contracts: {deployed_contracts}")
+        contract_user_count = await data_center.get_contract_user_count(address="0x237fFd169341686762C9E29ADEc65b98eb3EaA76", chain='ethereum')
+        logger.info(f"Contract User Count: {contract_user_count}")
+        contract_tx_count = await data_center.get_contract_tx_count(address="0x237fFd169341686762C9E29ADEc65b98eb3EaA76", chain='ethereum')
+        logger.info(f"Contract TX Count: {contract_tx_count}")
         # # Example 3: Get top holders
         # top_holders = await data_center.get_top_holders(token_address, limit=10)
         # logger.info(f"Top 5 Holders: {top_holders}")
