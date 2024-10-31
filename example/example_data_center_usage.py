@@ -9,6 +9,7 @@ from web3_data_center.core.data_center import DataCenter
 from web3_data_center.utils.logger import get_logger
 import datetime
 import pandas as pd
+from web3 import Web3
 logger = get_logger(__name__)
 
 async def main():
@@ -30,12 +31,16 @@ async def main():
         # false_count = results.count(False)
         # false_percentage = (false_count / len(results)) * 100
         # print(f"Percentage of unsafe tokens: {false_percentage:.2f}%")
-        deployed_contracts = await data_center.get_deployed_contracts(address="0x37aAb97476bA8dC785476611006fD5dDA4eed66B", chain='ethereum')
-        logger.info(f"Deployed Contracts: {deployed_contracts}")
-        contract_user_count = await data_center.get_contract_user_count(address="0x237fFd169341686762C9E29ADEc65b98eb3EaA76", chain='ethereum')
-        logger.info(f"Contract User Count: {contract_user_count}")
-        contract_tx_count = await data_center.get_contract_tx_count(address="0x237fFd169341686762C9E29ADEc65b98eb3EaA76", chain='ethereum')
-        logger.info(f"Contract TX Count: {contract_tx_count}")
+        # deployed_contracts = await data_center.get_deployed_contracts(address="0x37aAb97476bA8dC785476611006fD5dDA4eed66B", chain='ethereum')
+        # logger.info(f"Deployed Contracts: {deployed_contracts}")
+        df = pd.read_csv('contracts.csv')
+        w3 = Web3()
+        contracts = df['contract_address'].tolist()
+        for contract in contracts:
+            contract_user_count = await data_center.get_contract_user_count(address=w3.to_checksum_address(contract), chain='ethereum')
+            logger.info(f"Contract User Count: {contract_user_count}")
+            # contract_tx_count = await data_center.get_contract_tx_count(address=w3.to_checksum_address(contract), chain='ethereum')
+            # logger.info(f"Contract TX Count: {contract_tx_count}")
         # # Example 3: Get top holders
         # top_holders = await data_center.get_top_holders(token_address, limit=10)
         # logger.info(f"Top 5 Holders: {top_holders}")

@@ -202,10 +202,10 @@ class DataCenter:
         chain_obj = get_chain_info(chain)
         try:
             response = await self.chainbase_client.query({
-                "query":f"SELECT COUNT(from_address)\nFROM {chain_obj.icon}.transactions\nWHERE to_address = '{address}'"
+                "query":f"SELECT count(from_address)\nFROM {chain_obj.icon}.transactions\nWHERE to_address = '{address}'"
             })
             if response and 'data' in response:
-                user_count = response['data']['result'][0]['COUNT(from_address)']
+                user_count = response['data']['result'][0]['count(from_address)']
                 self.cache[cache_key] = user_count
                 return user_count
             return 0
@@ -220,10 +220,10 @@ class DataCenter:
         chain_obj = get_chain_info(chain)
         try:
             response = await self.chainbase_client.query({
-                "query":f"SELECT COUNT(*)\nFROM {chain_obj.icon}.transactions\nWHERE to_address = '{address}'"
+                "query":f"SELECT count(*)\nFROM {chain_obj.icon}.transactions\nWHERE to_address = '{address}'"
             })
             if response and 'data' in response:
-                tx_count = response['data']['result'][0]['COUNT(*)']
+                tx_count = response['data']['result'][0]['count(*)']
                 self.cache[cache_key] = tx_count
                 return tx_count
             return 0
