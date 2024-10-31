@@ -14,7 +14,7 @@ from ..utils.logger import get_logger
 import time
 import datetime
 from chain_index import get_chain_info
-
+from web3 import Web3
 logger = get_logger(__name__)
 
 class DataCenter:
@@ -326,6 +326,54 @@ class DataCenter:
         token_security = await self.goplus_client.get_tokens_security([address], chain)[0]
         self.cache[cache_key] = token_security
         return token_security
+
+
+    async def calculate_pair_address(self, tokenA, tokenB, dex_type='uniswap_v2', fee=None):
+        w3 = Web3()
+
+        dex_settings = {
+            'uniswap_v2': {
+                'factory_address': '0x5C69bEe701ef814a2B6a3EDD4B1652CB9cc5aA6f',
+                'init_code_hash': '0x96e8ac4277198ff8b6f785478aa9a39f403cb768dd02cbee326c3e7da348845f'
+            },
+            'uniswap_v3': {
+                'factory_address': '0x1F98431c8aD98523631AE4a59f267346ea31F984',
+                'init_code_hash': '0xe34f199b19b2b4f47f68442619d555527d244f78a3297ea89325f843f87b8b54'
+            },
+            'sushiswap_v2': {
+                'factory_address': '0xC0AeE478e3658e2610c5F7A4A2E1777cE9e4f2Ac',
+                'init_code_hash': '0x96e8ac42782006f8894161745b24916fe9339b629bc3e7ca895b7c575c1d9c77'
+            }
+        }
+
+        dex = dex_settings.get(dex_type.lower())
+        if not dex:
+            raise ValueError("Unsupported DEX type")
+
+        if tokenA > tokenB:
+            tokenA, tokenB = tokenB, tokenA
+
+        if dex_type.lower() == 'uniswap_v3' and fee is not None:
+            salt = Web3.keccak(
+                w3.codec.encode(['address', 'address', 'uint24'],
+                            [Web3.toChecksumAddress(tokenA),
+                            Web3.toChecksumAddress(tokenB),
+                            fee])
+            )
+        else:
+            salt = Web3.keccak(Web3.toBytes(hexstr=tokenA) + Web3.toBytes(hexstr=tokenB))
+
+        pair_address = w3.solidityKeccak(
+            ['bytes', 'address', 'bytes32', 'bytes32'],
+            [
+                '0xff',
+                dex['factory_address'],
+                salt,
+                dex['init_code_hash']
+            ]
+        )[-20:]
+
+        return w3.toChecksumAddress(pair_address)
 
     async def check_tokens_safe(self, address_list: List[str], chain: str = 'sol') -> List[bool]:
         chain_obj = get_chain_info(chain)
