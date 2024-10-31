@@ -21,13 +21,13 @@ async def process_contracts(data_center, contracts, chain='ethereum'):
     for contract in contracts:
         try:
             # Get contract metrics
-            user_count = await data_center.get_contract_user_count(address=w3.to_checksum_address(contract), chain=chain)
+            user_count = await data_center.get_contract_tx_user_count(address=w3.to_checksum_address(contract), chain=chain)
             # tx_count = await data_center.get_contract_tx_count(address=contract, chain=chain)
             
             results.append({
                 'contract_address': contract,
-                'user_count': user_count,
-                # 'transaction_count': tx_count
+                'tx_count': user_count['tx_count'],
+                'user_count': user_count['user_count'],
             })
             
             logger.info(f"Contract: {contract}, Users: {user_count}")
@@ -38,8 +38,8 @@ async def process_contracts(data_center, contracts, chain='ethereum'):
             logger.error(f"Error processing contract {contract}: {str(e)}")
             results.append({
                 'contract_address': contract,
+                'tx_count': None,
                 'user_count': None,
-                # 'transaction_count': None
             })
         
         pbar.update(1)

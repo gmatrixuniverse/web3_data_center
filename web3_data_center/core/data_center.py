@@ -195,41 +195,24 @@ class DataCenter:
             logger.error(f"Error fetching deployed contracts: {str(e)}")
             return []
 
-    async def get_contract_user_count(self, address: str, chain: str = 'sol') -> Optional[Dict[str, Any]]:
-        cache_key = f"contract_user_count:{chain}:{address}"
+    async def get_contract_tx_user_count(self, address: str, chain: str = 'sol') -> Optional[Dict[str, Any]]:
+        cache_key = f"contract_tx_user_count:{chain}:{address}"
         if cache_key in self.cache:
             return self.cache[cache_key]
         chain_obj = get_chain_info(chain)
         try:
             response = await self.chainbase_client.query({
-                "query":f"SELECT count(from_address)\nFROM {chain_obj.icon}.transactions\nWHERE to_address = '{address}'"
+                "query":f"SELECT count(*) as tx_count, count(DISTINCT from_address) as user_count\nFROM {chain_obj.icon}.transactions\nWHERE to_address = '{address}'"
             })
             if response and 'data' in response:
-                user_count = response['data']['result'][0]['count(from_address)']
-                self.cache[cache_key] = user_count
-                return user_count
-            return 0
+                user_count = response['data']['result'][0]['user_count']
+                tx_count = response['data']['result'][0]['tx_count']
+                self.cache[cache_key] = {'user_count': user_count, 'tx_count': tx_count}
+                return {'user_count': user_count, 'tx_count': tx_count}
+            return {'user_count': 0, 'tx_count': 0}
         except Exception as e:
             logger.error(f"Error fetching contract user count: {str(e)}")
-            return 0
-        
-    async def get_contract_tx_count(self, address: str, chain: str = 'sol') -> Optional[Dict[str, Any]]:
-        cache_key = f"contract_tx_count:{chain}:{address}"
-        if cache_key in self.cache:
-            return self.cache[cache_key]
-        chain_obj = get_chain_info(chain)
-        try:
-            response = await self.chainbase_client.query({
-                "query":f"SELECT count(*)\nFROM {chain_obj.icon}.transactions\nWHERE to_address = '{address}'"
-            })
-            if response and 'data' in response:
-                tx_count = response['data']['result'][0]['count(*)']
-                self.cache[cache_key] = tx_count
-                return tx_count
-            return 0
-        except Exception as e:
-            logger.error(f"Error fetching contract tx count: {str(e)}")
-            return 0
+            return {'user_count': 0, 'tx_count': 0}
 
     def clear_cache(self):
         self.cache.clear()
