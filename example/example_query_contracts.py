@@ -29,7 +29,7 @@ async def process_contracts(data_center, contracts, chain='ethereum'):
                 'tx_count': user_count['tx_count'],
                 'user_count': user_count['user_count'],
             })
-            
+
             logger.info(f"Contract: {contract}, Users: {user_count}")
 
             await asyncio.sleep(60)
@@ -41,9 +41,9 @@ async def process_contracts(data_center, contracts, chain='ethereum'):
                 'tx_count': None,
                 'user_count': None,
             })
-        
+
         pbar.update(1)
-    
+
     pbar.close()
     return results
 
@@ -55,7 +55,7 @@ async def main():
         # Read contracts from CSV
         df = pd.read_csv('contracts.csv')
         contracts = df['contract_address'].tolist()
-        
+        # deployed_contracts = await data_center.get_deployed_contracts(address="0x37aAb97476bA8dC785476611006fD5dDA4eed66B", chain='ethereum')
         # Process contracts
         results = await process_contracts(data_center, contracts)
         

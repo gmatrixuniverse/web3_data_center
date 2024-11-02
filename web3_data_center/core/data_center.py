@@ -28,32 +28,86 @@ class DataCenter:
         # self.opensearch_client = OpenSearchClient(config_path=config_path)
         self.cache = {}
 
-    async def get_token_call_performance(self, address: str, called_time: datetime.datetime, chain: str = 'sol') -> Optional[Token]:
-        info = (await self.get_token_info(address, chain))
-        # logger.info(f"Got token info for {address} on {chain}: {info}")
-        symbol = info.symbol
-        price_history = await self.get_token_price_history(address, chain, resolution='1m', from_time=int(called_time.timestamp()), to_time=int(time.time()))
-        # price at called_time
-        called_price = float(price_history[0]['close'])
+async def get_token_call_performance(self, address: str, called_time: datetime.datetime, chain: str = 'sol') -> Optional[tuple[str, float, float]]:
+    try:
+        # Get token info with validation
+        info = await self.get_token_info(address, chain)
+        if not info or not info.symbol:
+            logger.error(f"Failed to get token info for {address} on {chain}")
+            return None
+        
+        # Get price history with validation
+        price_history = await self.get_token_price_history(
+            address, 
+            chain, 
+            resolution='1m', 
+            from_time=int(called_time.timestamp()), 
+            to_time=int(time.time())
+        )
+        
+        if not price_history or len(price_history) == 0:
+            logger.error(f"No price history available for {address} on {chain}")
+            return None
+            
+        # Get initial price with validation
+        try:
+            called_price = float(price_history[0]['close'])
+            if called_price <= 0:
+                logger.error(f"Invalid called price ({called_price}) for {address}")
+                return None
+        except (KeyError, ValueError, IndexError) as e:
+            logger.error(f"Error parsing initial price for {address}: {str(e)}")
+            return None
+
         logger.info(f"Called price: {called_price}")
+        
+        # Track price extremes
         max_price = called_price
         max_price_timestamp = None
         min_price = called_price
         min_price_timestamp = None
+        current_time = datetime.datetime.now()
+        
+        # Process price history
         for price_point in price_history:
-            price_point_time = datetime.datetime.fromtimestamp(int(price_point['time'])/1000)  # Assuming 'time' is in milliseconds
-            if price_point_time > datetime.datetime.now():
-                break
-            if float(price_point['close']) > max_price:
-                max_price = float(price_point['close'])
-                max_price_timestamp = price_point['time']
-            if float(price_point['close']) < min_price:
-                min_price = float(price_point['close'])
-                min_price_timestamp = price_point['time']
-        logger.info(f"Max price: {max_price}, Max price timestamp: {max_price_timestamp}, Min price: {min_price}, Min price timestamp: {min_price_timestamp}")
+            try:
+                # Validate price point data
+                if not all(k in price_point for k in ['time', 'close']):
+                    continue
+                    
+                price_point_time = datetime.datetime.fromtimestamp(int(price_point['time'])/1000)
+                if price_point_time > current_time:
+                    break
+                    
+                close_price = float(price_point['close'])
+                if close_price <= 0:
+                    continue
+                    
+                if close_price > max_price:
+                    max_price = close_price
+                    max_price_timestamp = price_point['time']
+                if close_price < min_price:
+                    min_price = close_price
+                    min_price_timestamp = price_point['time']
+                    
+            except (ValueError, KeyError, TypeError) as e:
+                logger.warning(f"Error processing price point for {address}: {str(e)}")
+                continue
+
+        logger.info(
+            f"Max price: {max_price}, Max price timestamp: {max_price_timestamp}, "
+            f"Min price: {min_price}, Min price timestamp: {min_price_timestamp}"
+        )
+
+        # Calculate performance metrics
         drawdown = min_price / called_price - 1 if called_price > min_price else 0
         ath_multiple = max_price / called_price - 1
-        return symbol, ath_multiple, drawdown
+        
+        return info.symbol, ath_multiple, drawdown
+        
+    except Exception as e:
+        logger.error(f"Error in get_token_call_performance for {address} on {chain}: {str(e)}")
+        return None 
 
     async def get_token_price_at_time(self, address: str, chain: str = 'sol') -> Optional[Token]:
         cache_key = f"token_info:{chain}:{address}"

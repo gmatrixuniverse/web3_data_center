@@ -118,3 +118,4 @@ cython_debug/
 config.yml
 tokens.csv
 contracts.csv
+contract_metrics.csv
