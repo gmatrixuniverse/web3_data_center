@@ -28,11 +28,11 @@ class Token:
             address=data['address'],
             name=data.get('name', ''),  # Name is not provided in the sample, use empty string as default
             symbol=data['symbol'],
-            decimals=None,  # Decimals are not provided in the sample
-            total_supply=None,  # Total supply is not provided in the sample
+            decimals=data.get('decimals', None),  # Decimals are not provided in the sample
+            total_supply=data.get('total_supply', None),  # Total supply is not provided in the sample
             market_cap=float(data['market_cap']) if 'market_cap' in data else None,
             price=float(data['price']) if 'price' in data else None,
-            volume_24h=float(data['volume']) if 'volume' in data else None,
+            volume_24h=float(data['volume_24h']) if 'volume_24h' in data else None,
             liquidity=float(data['liquidity']) if 'liquidity' in data else None,
             holder_count=int(data['holder_count']) if 'holder_count' in data else None,
             swap_count_24h=int(data['swaps_24h']) if 'swaps_24h' in data else None,

@@ -150,18 +150,11 @@ class GMGNAPIClient(BaseClient):
             return None
             
         token_data = response.get('data', {}).get('token', {})
+        # print(token_data)
         if not token_data:
             return None
             
-        return Token(
-            address=token_data.get('address'),
-            name=token_data.get('name'),
-            symbol=token_data.get('symbol'),
-            decimals=token_data.get('decimals'),
-            total_supply=token_data.get('total_supply'),
-            holder_count=token_data.get('holder_count'),
-            chain=chain
-        )
+        return self._convert_to_token(token_data)
 
     async def get_wallet_holdings(self, wallet_address: str, chain: str = 'sol', order_by: str = 'last_active_timestamp', direction: str = 'desc', show_small: bool = True, sellout: bool = True, limit: int = 50, tx30d: bool = True) -> Optional[List[Dict[str, Any]]]:
         chain = 'sol' if chain == 'solana' else chain

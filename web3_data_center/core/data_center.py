@@ -4,6 +4,7 @@ from ..clients.geckoterminal_client import GeckoTerminalClient
 from ..clients.gmgn_api_client import GMGNAPIClient
 from ..clients.birdeye_client import BirdeyeClient
 from ..clients.solscan_client import SolscanClient
+from ..clients.dexscreener_client import DexScreenerClient
 from ..clients.goplus_client import GoPlusClient
 from ..clients.opensearch_client import OpenSearchClient
 from ..clients.chainbase_client import ChainbaseClient
@@ -24,6 +25,7 @@ class DataCenter:
         self.birdeye_client = BirdeyeClient(config_path=config_path)
         self.solscan_client = SolscanClient(config_path=config_path)
         self.goplus_client = GoPlusClient(config_path=config_path)
+        self.dexscreener_client = DexScreenerClient(config_path=config_path)
         self.chainbase_client = ChainbaseClient(config_path=config_path)
         self.w3_client = Web3(Web3.HTTPProvider("http://192.168.0.105:8545"))
         # self.opensearch_client = OpenSearchClient(config_path=config_path)
@@ -139,8 +141,9 @@ class DataCenter:
                 # print(f"Token from gmgn: {token}")
         elif chaininfo.chainId == 1:
             token = await self.gmgn_client.get_token_info(address, chain)
+            if not token:
+                token = await self.dexscreener_client.get_processed_token_info([address])
             # Implement for other chains if needed
-            pass
 
         if token:
             self.cache[cache_key] = token
@@ -432,6 +435,28 @@ class DataCenter:
         except Exception as e:
             logger.error(f"Error getting latest swap orders: {str(e)}")
             return []
+
+    async def get_pairs_info(self, query_string: str) -> List[Dict[str, Any]]:
+        try:
+            response = await self.dexscreener_client.search_pairs(query_string)
+            if response and 'pairs' in response:
+                return response['pairs']
+            return []
+        except Exception as e:
+            logger.error(f"Error getting pairs info: {str(e)}")
+            return []
+
+
+    async def get_best_pair(self, contract_address: str) -> List[Dict[str, Any]]:
+        try:
+            pairs = await self.get_pairs_info(contract_address)
+            if len(pairs)>0:
+                return pairs[0]
+            return None
+        except Exception as e:
+            logger.error(f"Error getting best pair: {str(e)}")
+            return None
+
 
     async def get_latest_txs_with_logs(self, address_list: List[str], chain: str = 'eth') -> List[Dict[str, Any]]:
         try:

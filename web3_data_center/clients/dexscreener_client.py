@@ -78,7 +78,6 @@ class DexScreenerClient(BaseClient):
 
     async def get_processed_token_info(self, addresses: List[str]) -> Dict[str, Any]:
         raw_info = await self.fetch_token_info(addresses)
-        print(raw_info)
         return self.process_token_info(raw_info)
 
     async def get_processed_search_results(self, query: str) -> Dict[str, Any]:
