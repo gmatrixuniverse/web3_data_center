@@ -25,89 +25,90 @@ class DataCenter:
         self.solscan_client = SolscanClient(config_path=config_path)
         self.goplus_client = GoPlusClient(config_path=config_path)
         self.chainbase_client = ChainbaseClient(config_path=config_path)
+        self.w3_client = Web3(Web3.HTTPProvider("http://192.168.0.105:8545"))
         # self.opensearch_client = OpenSearchClient(config_path=config_path)
         self.cache = {}
 
-async def get_token_call_performance(self, address: str, called_time: datetime.datetime, chain: str = 'sol') -> Optional[tuple[str, float, float]]:
-    try:
-        # Get token info with validation
-        info = await self.get_token_info(address, chain)
-        if not info or not info.symbol:
-            logger.error(f"Failed to get token info for {address} on {chain}")
-            return None
-        
-        # Get price history with validation
-        price_history = await self.get_token_price_history(
-            address, 
-            chain, 
-            resolution='1m', 
-            from_time=int(called_time.timestamp()), 
-            to_time=int(time.time())
-        )
-        
-        if not price_history or len(price_history) == 0:
-            logger.error(f"No price history available for {address} on {chain}")
-            return None
-            
-        # Get initial price with validation
+    async def get_token_call_performance(self, address: str, called_time: datetime.datetime, chain: str = 'sol') -> Optional[tuple[str, float, float]]:
         try:
-            called_price = float(price_history[0]['close'])
-            if called_price <= 0:
-                logger.error(f"Invalid called price ({called_price}) for {address}")
+            # Get token info with validation
+            info = await self.get_token_info(address, chain)
+            if not info or not info.symbol:
+                logger.error(f"Failed to get token info for {address} on {chain}")
                 return None
-        except (KeyError, ValueError, IndexError) as e:
-            logger.error(f"Error parsing initial price for {address}: {str(e)}")
-            return None
-
-        logger.info(f"Called price: {called_price}")
-        
-        # Track price extremes
-        max_price = called_price
-        max_price_timestamp = None
-        min_price = called_price
-        min_price_timestamp = None
-        current_time = datetime.datetime.now()
-        
-        # Process price history
-        for price_point in price_history:
+            
+            # Get price history with validation
+            price_history = await self.get_token_price_history(
+                address, 
+                chain, 
+                resolution='1m', 
+                from_time=int(called_time.timestamp()), 
+                to_time=int(time.time())
+            )
+            
+            if not price_history or len(price_history) == 0:
+                logger.error(f"No price history available for {address} on {chain}")
+                return None
+                
+            # Get initial price with validation
             try:
-                # Validate price point data
-                if not all(k in price_point for k in ['time', 'close']):
-                    continue
-                    
-                price_point_time = datetime.datetime.fromtimestamp(int(price_point['time'])/1000)
-                if price_point_time > current_time:
-                    break
-                    
-                close_price = float(price_point['close'])
-                if close_price <= 0:
-                    continue
-                    
-                if close_price > max_price:
-                    max_price = close_price
-                    max_price_timestamp = price_point['time']
-                if close_price < min_price:
-                    min_price = close_price
-                    min_price_timestamp = price_point['time']
-                    
-            except (ValueError, KeyError, TypeError) as e:
-                logger.warning(f"Error processing price point for {address}: {str(e)}")
-                continue
+                called_price = float(price_history[0]['close'])
+                if called_price <= 0:
+                    logger.error(f"Invalid called price ({called_price}) for {address}")
+                    return None
+            except (KeyError, ValueError, IndexError) as e:
+                logger.error(f"Error parsing initial price for {address}: {str(e)}")
+                return None
 
-        logger.info(
-            f"Max price: {max_price}, Max price timestamp: {max_price_timestamp}, "
-            f"Min price: {min_price}, Min price timestamp: {min_price_timestamp}"
-        )
+            logger.info(f"Called price: {called_price}")
+            
+            # Track price extremes
+            max_price = called_price
+            max_price_timestamp = None
+            min_price = called_price
+            min_price_timestamp = None
+            current_time = datetime.datetime.now()
+            
+            # Process price history
+            for price_point in price_history:
+                try:
+                    # Validate price point data
+                    if not all(k in price_point for k in ['time', 'close']):
+                        continue
+                        
+                    price_point_time = datetime.datetime.fromtimestamp(int(price_point['time'])/1000)
+                    if price_point_time > current_time:
+                        break
+                        
+                    close_price = float(price_point['close'])
+                    if close_price <= 0:
+                        continue
+                        
+                    if close_price > max_price:
+                        max_price = close_price
+                        max_price_timestamp = price_point['time']
+                    if close_price < min_price:
+                        min_price = close_price
+                        min_price_timestamp = price_point['time']
+                        
+                except (ValueError, KeyError, TypeError) as e:
+                    logger.warning(f"Error processing price point for {address}: {str(e)}")
+                    continue
 
-        # Calculate performance metrics
-        drawdown = min_price / called_price - 1 if called_price > min_price else 0
-        ath_multiple = max_price / called_price - 1
-        
-        return info.symbol, ath_multiple, drawdown
-        
-    except Exception as e:
-        logger.error(f"Error in get_token_call_performance for {address} on {chain}: {str(e)}")
-        return None 
+            logger.info(
+                f"Max price: {max_price}, Max price timestamp: {max_price_timestamp}, "
+                f"Min price: {min_price}, Min price timestamp: {min_price_timestamp}"
+            )
+
+            # Calculate performance metrics
+            drawdown = min_price / called_price - 1 if called_price > min_price else 0
+            ath_multiple = max_price / called_price - 1
+            
+            return info.symbol, ath_multiple, drawdown
+            
+        except Exception as e:
+            logger.error(f"Error in get_token_call_performance for {address} on {chain}: {str(e)}")
+            return None 
 
     async def get_token_price_at_time(self, address: str, chain: str = 'sol') -> Optional[Token]:
         cache_key = f"token_info:{chain}:{address}"
@@ -415,3 +416,78 @@ async def get_token_call_performance(self, address: str, called_time: datetime.d
     async def check_tokens_safe(self, address_list: List[str], chain: str = 'sol') -> List[bool]:
         chain_obj = get_chain_info(chain)
         return await self.goplus_client.check_tokens_safe(chain_id=chain_obj.chainId, token_address_list=address_list)
+
+    async def get_latest_swap_orders(self, address_list: List[str], chain: str = 'eth') -> List[Dict[str, Any]]:
+        try:
+            chain_obj = get_chain_info(chain)
+            if chain_obj.chainId == 1:
+                txs = await self.get_latest_txs_with_logs(address_list, chain)
+                return txs
+            elif chain_obj.chainId == 137:
+                logs = []
+                return logs
+            else:
+                raise ValueError(f"Unsupported chain: {chain}")
+                
+        except Exception as e:
+            logger.error(f"Error getting latest swap orders: {str(e)}")
+            return []
+
+    async def get_latest_txs_with_logs(self, address_list: List[str], chain: str = 'eth') -> List[Dict[str, Any]]:
+        try:
+            chain_obj = get_chain_info(chain)
+            if chain_obj.chainId == 1:
+                # Use loop.run_in_executor for blocking Web3 calls
+                loop = asyncio.get_event_loop()
+                
+                # Get transactions and logs concurrently
+                block = await loop.run_in_executor(None, lambda: self.w3_client.eth.get_block("latest", full_transactions=True))
+                logs = await loop.run_in_executor(None, lambda: self.w3_client.eth.get_logs({
+                    'fromBlock': "latest",
+                    'toBlock': "latest"
+                }))
+                
+                # Create a map of transaction hash to logs
+                tx_logs_map = {}
+                for log in logs:
+                    tx_hash = log['transactionHash'].hex() if isinstance(log['transactionHash'], bytes) else log['transactionHash']
+                    if tx_hash not in tx_logs_map:
+                        tx_logs_map[tx_hash] = []
+                    tx_logs_map[tx_hash].append(log)
+                
+                # Attach logs to their corresponding transactions
+                processed_txs = []
+                for tx in block['transactions']:
+                    tx_hash = tx['hash'].hex() if isinstance(tx['hash'], bytes) else tx['hash']
+                    processed_tx = dict(tx)
+                    processed_tx['logs'] = tx_logs_map.get(tx_hash, [])
+                    processed_txs.append(processed_tx)
+                
+                return processed_txs
+                
+            else:
+                raise ValueError(f"Unsupported chain: {chain}")
+                
+        except Exception as e:
+            logger.error(f"Error in get_latest_txs_with_logs: {str(e)}")
+            return []
+
+    async def get_latest_swap_txs(self, chain: str = 'ethereum') -> List[Dict[str, Any]]:
+        try:
+            chain_obj = get_chain_info(chain)
+            if chain_obj.chainId == 1:
+                # Use loop.run_in_executor for blocking Web3 calls
+                loop = asyncio.get_event_loop()
+                txs = await loop.run_in_executor(None, lambda: self.w3_client.eth.get_block("latest",full_transactions=True))
+                return txs
+
+            elif chain_obj.chainId == 137:
+                txs = await loop.run_in_executor(None, lambda: self.w3_client.eth.get_block("latest",full_transactions=True))
+                return txs
+
+            else:
+                raise ValueError(f"Unsupported chain: {chain}")
+                
+        except Exception as e:
+            logger.error(f"Error getting latest swap orders: {str(e)}")
+            return []

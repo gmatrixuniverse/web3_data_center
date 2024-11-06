@@ -15,6 +15,7 @@ import json
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
+
 class RateLimiter:
     def __init__(self, rpm: int = 120):
         self.rate_limit = rpm
