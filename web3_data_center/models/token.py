@@ -26,17 +26,17 @@ class Token:
     def from_gmgn(cls, data: dict) -> 'Token':
         return cls(
             address=data['address'],
-            name=data.get('name', ''),  # Name is not provided in the sample, use empty string as default
+            name=data.get('name', ''),
             symbol=data['symbol'],
-            decimals=data.get('decimals', None),  # Decimals are not provided in the sample
-            total_supply=data.get('total_supply', None),  # Total supply is not provided in the sample
-            market_cap=float(data['market_cap']) if 'market_cap' in data else None,
-            price=float(data['price']) if 'price' in data else None,
-            volume_24h=float(data['volume_24h']) if 'volume_24h' in data else None,
-            liquidity=float(data['liquidity']) if 'liquidity' in data else None,
-            holder_count=int(data['holder_count']) if 'holder_count' in data else None,
-            swap_count_24h=int(data['swaps_24h']) if 'swaps_24h' in data else None,
-            created_at=datetime.fromtimestamp(data['open_timestamp']) if 'open_timestamp' in data else None,
+            decimals=data.get('decimals', None),
+            total_supply=data.get('total_supply', None),
+            market_cap=float(data['market_cap']) if data.get('market_cap') is not None else None,
+            price=float(data['price']) if data.get('price') is not None else None,
+            volume_24h=float(data['volume_24h']) if data.get('volume_24h') is not None else None,
+            liquidity=float(data['liquidity']) if data.get('liquidity') is not None else None,
+            holder_count=int(data['holder_count']) if data.get('holder_count') is not None else None,
+            swap_count_24h=int(data['swaps_24h']) if data.get('swaps_24h') is not None else None,
+            created_at=datetime.fromtimestamp(data['open_timestamp']) if data.get('open_timestamp') is not None else None,
             chain=data.get('chain', 'solana')
         )
 

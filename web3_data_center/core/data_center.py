@@ -448,7 +448,7 @@ class DataCenter:
                 logs = await self.get_logs_at_block(block_number, chain, [pair_address])
                 for log in logs:
                     if is_pair_swap(log):
-                        orders = self.analyzer.reconstruct_order_from_log(log,token_contract)
+                        orders = self.reconstruct_order_from_log(log,token_contract)
                         swap_orders.append(orders)
                 return swap_orders
             elif chain_obj.chainId == 137:
