@@ -553,8 +553,8 @@ class DataCenter:
                 'side': side,
                 'token_amount': token_amount,
                 'native_token_amount': native_token_amount,
-                'price': 1,
-                'volumeUSD': 100,
+                'price': token_amount / native_token_amount if native_token_amount != 0 else 0,
+                'volumeUSD': native_token_amount,
                 'platform': tx['to'],
                 'transaction_hash': tx['hash']
             }
