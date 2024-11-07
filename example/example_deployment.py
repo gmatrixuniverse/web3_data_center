@@ -21,12 +21,14 @@ async def main():
     data_center = DataCenter()
     try:
         token_contract = '0x2025bf4e0c1117685b1bf2ea2be56c7deb11bc99'
-        deployed_block = await data_center.get_deployed_block(token_contract)
-        pair_address = '0xBF36AbDf1ac7536adC354FB5A0DeDb4C155520d3'
-        orders = await data_center.get_token_pair_orders_between(token_contract, pair_address, deployed_block, 99999999)
-        logger.info(deployed_block)
-        logger.info(orders)
+        # deployed_block = await data_center.get_deployed_block(token_contract)
+        # pair_address = '0xBF36AbDf1ac7536adC354FB5A0DeDb4C155520d3'
+        # orders = await data_center.get_token_pair_orders_between(token_contract, pair_address, deployed_block, 99999999)
+        # logger.info(deployed_block)
+        # logger.info(orders)
 
+        pairs = await data_center.get_pairs_info(token_contract)
+        logger.info(pairs)
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
     finally:
