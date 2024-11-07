@@ -97,10 +97,18 @@ class BaseClient:
             headers['Authorization'] = aiohttp.BasicAuth(self.credentials['username'], self.credentials['password']).encode()
         elif self.auth_method == "NoAuth":
             pass
+        elif self.auth_method == "Param":
+            pass
         else:
             raise ValueError(f"Unsupported authentication method: {self.auth_method}")
 
         return headers
+
+    def _set_auth_params(self, params: Dict[str, Any]):
+        if self.auth_method == "Param":
+            param_name = self.credentials.get("param_name", "apikey")
+            params[param_name] = self.credentials['api_key']
+        return params
 
     def _get_oauth2_token(self) -> Dict[str, str]:
         token_url = self.credentials['token_url']
@@ -145,7 +153,7 @@ class BaseClient:
         full_headers = {**self.headers, **(headers or {})}
         full_headers['Content-Type'] = 'application/json'
         full_headers['Accept'] = 'application/json'
-
+        params = self._set_auth_params(params)
         if self.use_zenrows:
             url, params = self._prepare_zenrows_request(url, params)
 

@@ -1,5 +1,4 @@
 import asyncio
-from web3_data_center.clients.opensearch_client import OpenSearchClient
 from web3_data_center.core.data_center import DataCenter
 from web3_data_center.utils.logger import get_logger
 from web3_data_center.utils.database import Database

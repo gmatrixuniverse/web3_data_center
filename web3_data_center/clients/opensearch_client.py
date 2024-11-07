@@ -25,9 +25,9 @@ class OpenSearchClient(BaseClient):
             verify_certs=True,
             timeout=self.config['api']['opensearch'].get('timeout', 120)
         )
-        logger.info(f"OpenSearch host: {self.config['api']['opensearch']['hosts']}")
-        logger.info(f"OpenSearch username: {self.credentials['username']}")
-        logger.info(f"OpenSearch password: {self.credentials['password']}")
+        # logger.info(f"OpenSearch host: {self.config['api']['opensearch']['hosts']}")
+        # logger.info(f"OpenSearch username: {self.credentials['username']}")
+        # logger.info(f"OpenSearch password: {self.credentials['password']}")
 
     async def test_connection(self) -> bool:
         try:

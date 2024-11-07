@@ -1,13 +1,6 @@
 import asyncio
 from typing import Dict, List, Optional, Any
-from ..clients.geckoterminal_client import GeckoTerminalClient
-from ..clients.gmgn_api_client import GMGNAPIClient
-from ..clients.birdeye_client import BirdeyeClient
-from ..clients.solscan_client import SolscanClient
-from ..clients.dexscreener_client import DexScreenerClient
-from ..clients.goplus_client import GoPlusClient
-from ..clients.opensearch_client import OpenSearchClient
-from ..clients.chainbase_client import ChainbaseClient
+from ..clients import *
 from ..models.token import Token
 from ..models.holder import Holder
 from ..models.price_history_point import PriceHistoryPoint
@@ -15,6 +8,10 @@ from ..utils.logger import get_logger
 import time
 import datetime
 from chain_index import get_chain_info
+from evm_decoder.utils.abi_utils import is_pair_swap
+from evm_decoder.utils.constants import UNI_V2_SWAP_TOPIC, UNI_V3_SWAP_TOPIC
+from evm_decoder import DecoderManager, AnalyzerManager
+from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from web3 import Web3
 logger = get_logger(__name__)
 
@@ -27,8 +24,12 @@ class DataCenter:
         self.goplus_client = GoPlusClient(config_path=config_path)
         self.dexscreener_client = DexScreenerClient(config_path=config_path)
         self.chainbase_client = ChainbaseClient(config_path=config_path)
+        self.etherscan_client = EtherscanClient(config_path=config_path)
+        self.opensearch_client = OpenSearchClient(config_path=config_path)
         self.w3_client = Web3(Web3.HTTPProvider("http://192.168.0.105:8545"))
-        # self.opensearch_client = OpenSearchClient(config_path=config_path)
+        self.analyzer  = AnalyzerManager()
+        self.decoder = DecoderManager()
+
         self.cache = {}
 
     async def get_token_call_performance(self, address: str, called_time: datetime.datetime, chain: str = 'sol') -> Optional[tuple[str, float, float]]:
@@ -62,7 +63,7 @@ class DataCenter:
                 logger.error(f"Error parsing initial price for {address}: {str(e)}")
                 return None
 
-            logger.info(f"Called price: {called_price}")
+            # logger.info(f"Called price: {called_price}")
             
             # Track price extremes
             max_price = called_price
@@ -231,7 +232,7 @@ class DataCenter:
         self.cache[cache_key] = wallet_data
         return wallet_data
 
-    async def get_deployed_contracts(self, address: str, chain: str = 'sol') -> Optional[List[Dict[str, Any]]]:
+    async def get_deployed_contracts(self, address: str, chain: str = 'eth') -> Optional[List[Dict[str, Any]]]:
         cache_key = f"deployed_contracts:{chain}:{address}"
         if cache_key in self.cache:
             return self.cache[cache_key]
@@ -252,6 +253,25 @@ class DataCenter:
         except Exception as e:
             logger.error(f"Error fetching deployed contracts: {str(e)}")
             return []
+
+    async def get_deployed_block(self, address: str, chain: str = 'eth') -> Optional[int]:
+        cache_key = f"deployed_block:{chain}:{address}"
+        if cache_key in self.cache:
+            return self.cache[cache_key]
+        
+        try:
+            deployment = await self.etherscan_client.get_deployment(address)
+            deployed_tx = deployment['txHash']
+            tx = self.w3_client.eth.get_transaction(deployed_tx)
+            deployed_block = tx['blockNumber']
+
+            self.cache[cache_key] = deployed_block
+            return deployed_block
+        except Exception as e:
+            logger.error(f"Error fetching deployed block for {address}: {str(e)}")
+            return None
+
+
 
     async def get_contract_tx_user_count(self, address: str, chain: str = 'sol') -> Optional[Dict[str, Any]]:
         cache_key = f"contract_tx_user_count:{chain}:{address}"
@@ -420,12 +440,17 @@ class DataCenter:
         chain_obj = get_chain_info(chain)
         return await self.goplus_client.check_tokens_safe(chain_id=chain_obj.chainId, token_address_list=address_list)
 
-    async def get_latest_swap_orders(self, address_list: List[str], chain: str = 'eth') -> List[Dict[str, Any]]:
+    async def get_token_pair_orders_at_block(self, token_contract: str, pair_address: str, block_number: int = -1, chain: str = 'eth') -> List[Dict[str, Any]]:
+        swap_orders = []
         try:
             chain_obj = get_chain_info(chain)
             if chain_obj.chainId == 1:
-                txs = await self.get_latest_txs_with_logs(address_list, chain)
-                return txs
+                logs = await self.get_logs_at_block(block_number, chain, [pair_address])
+                for log in logs:
+                    if is_pair_swap(log):
+                        orders = self.analyzer.reconstruct_order_from_log(log,token_contract)
+                        swap_orders.append(orders)
+                return swap_orders
             elif chain_obj.chainId == 137:
                 logs = []
                 return logs
@@ -436,6 +461,179 @@ class DataCenter:
             logger.error(f"Error getting latest swap orders: {str(e)}")
             return []
 
+    async def get_token_pair_orders_between(self, token_contract: str, pair_address: str, block_start: int = 0, block_end: int = 99999999, chain: str = 'eth') -> List[Dict[str, Any]]:
+        swap_orders = []
+        # logger.info(f"getting token pair orders between {block_start} and {block_end}")
+        try:
+            chain_obj = get_chain_info(chain)
+            if chain_obj.chainId == 1:
+                logs = self.w3_client.eth.get_logs({
+                    'fromBlock': block_start,
+                    'toBlock': block_end,
+                    'address': pair_address,
+                    'topics': [
+                        [UNI_V2_SWAP_TOPIC, UNI_V3_SWAP_TOPIC]
+                    ]
+                })
+                # logger.info(logs)
+                swap_orders = await self.reconstruct_orders_from_logs(logs,token_contract)
+                return swap_orders
+            elif chain_obj.chainId == 137:
+                logs = []
+                return logs
+            else:
+                raise ValueError(f"Unsupported chain: {chain}")
+                
+        except Exception as e:
+            logger.error(f"Error getting latest swap orders: {str(e)}")
+            return []
+
+    async def reconstruct_orders_from_logs(self, logs: List[Dict[str, Any]], token_contract: str) -> List[Dict[str, Any]]:
+        try:
+            orders = []
+            for log in logs:
+                order = await self.reconstruct_order_from_log(log, token_contract)
+                orders.append(order)
+            return orders
+        except Exception as e:
+            logger.error(f"Error reconstructing order from log: {str(e)}")
+            return None
+
+    async def reconstruct_order_from_log(self, log: Dict[str, Any], token_contract: str) -> Dict[str, Any]:
+        try:
+            # logger.info("reconstructing order from log")
+            tx = await self.get_tx_with_logs_by_log(log)
+            # logger.info("here is tx: ", tx, "and log: ", log)
+            analysis = self.analyzer.analyze_transaction(tx)
+            pair = log['address'].lower()
+            side = "Sell" if analysis['balance_analysis'][pair][token_contract.lower()] > 0 else "Buy"
+            token_amount = abs(analysis['balance_analysis'][pair][token_contract.lower()])
+            native_token_amount = abs(analysis['balance_analysis'][pair]['native'])
+            if side == "Buy":
+                token_balances = {
+                    addr: balances.get(token_contract.lower(), 0)
+                    for addr, balances in analysis['balance_analysis'].items()
+                }
+                max_token_amount = max(token_balances.values())
+                addresses_with_max = [
+                    addr for addr, amount in token_balances.items() 
+                    if amount == max_token_amount
+                ]
+                
+                if tx['from'].lower() in addresses_with_max:
+                    receiver = tx['from']
+                elif tx['to'].lower() in addresses_with_max:
+                    receiver = tx['to']
+                else:
+                    receiver = addresses_with_max[0]
+                
+            else:
+                # to know receiver in sell circumstance, we need to find the address with the largest native addition
+                token_balances = {
+                    addr: balances.get('native', 0)
+                    for addr, balances in analysis['balance_analysis'].items()
+                }
+                max_token_amount = max(token_balances.values())
+                addresses_with_max = [
+                    addr for addr, amount in token_balances.items() 
+                    if amount == max_token_amount
+                ]
+                if tx['from'].lower() in addresses_with_max:
+                    receiver = tx['from']
+                elif tx['to'].lower() in addresses_with_max:
+                    receiver = tx['to']
+                else:
+                    receiver = addresses_with_max[0]
+            print("check tx", tx)
+            order = {
+                'timestamp': tx['blockTimestamp'],
+                'trader': tx['from'],
+                'receiver': receiver,
+                'token': token_contract,
+                'side': side,
+                'token_amount': token_amount,
+                'native_token_amount': native_token_amount,
+                'price': 1,
+                'volumeUSD': 100,
+                'platform': tx['to'],
+                'transaction_hash': tx['hash']
+            }
+            return order
+        except Exception as e:
+            logger.error(f"Error reconstructing order from log: {str(e)}")
+            return None
+
+    async def get_tx_y_hash(self, tx_hash: str) -> Dict[str, Any]:
+        try:
+            tx = await self.w3_client.eth.get_transaction(tx_hash)
+            return tx
+        except Exception as e:
+            logger.error(f"Error getting tx by hash: {str(e)}")
+            return None
+
+    async def get_tx_with_logs_by_hash(self, tx_hash: str, return_dict: bool = True) -> Dict[str, Any]:
+        try:
+            # logger.info(f"getting tx with logs by hash: {tx_hash}")
+
+            if isinstance(tx_hash, bytes):
+                tx_hash = tx_hash.hex()
+            tx = self.w3_client.eth.get_transaction(tx_hash)
+            receipt = self.w3_client.eth.get_transaction_receipt(tx_hash)
+
+            if tx is None or receipt is None:
+                logger.error("Transaction or receipt not found")
+                raise ValueError("Transaction or receipt not found")
+
+            tx_dict = dict(tx)
+            for key, value in tx_dict.items():
+                if hasattr(value, 'hex'):
+                    tx_dict[key] = value.hex()
+
+            # add a blockTimestamp from any log to tx_dict
+            for log in receipt.logs:
+                if 'blockTimestamp' in log:
+                    tx_dict['blockTimestamp'] = log['blockTimestamp']
+                    break
+
+            logs = []
+            for log in receipt.logs:
+                log_dict = dict(log)
+                for key, value in log_dict.items():
+                    if hasattr(value, 'hex'):
+                        log_dict[key] = value.hex()
+                    elif isinstance(value, list):
+                        log_dict[key] = [
+                            item.hex() if hasattr(item, 'hex') else item
+                            for item in value
+                        ]
+                logs.append(log_dict)
+
+            tx_dict['logs'] = logs
+            return tx_dict
+
+        except Exception as e:
+            logger.error(f"Error fetching tx with logs: {e}")
+            raise  # 抛出异常以触发重试
+
+    async def get_tx_by_log(self, log: Dict[str, Any], token_contract: str, chain: str = 'eth') -> Dict[str, Any]:
+        try:
+            tx = await self.get_tx_by_hash(log['transactionHash'])
+            return tx
+        except Exception as e:
+            logger.error(f"Error getting tx with logs by log: {str(e)}")
+            return None
+
+    async def get_tx_with_logs_by_log(self, log: Dict[str, Any], chain: str = 'eth') -> Dict[str, Any]:
+        try:
+            # logger.info("getting tx with logs by log")
+            result = await self.get_tx_with_logs_by_hash(log['transactionHash'])
+            # logger.info(result)
+            return result
+
+        except Exception as e:
+            logger.error(f"Error getting tx with logs by log: {str(e)}")
+            return None
+
     async def get_pairs_info(self, query_string: str) -> List[Dict[str, Any]]:
         try:
             response = await self.dexscreener_client.search_pairs(query_string)
@@ -445,7 +643,6 @@ class DataCenter:
         except Exception as e:
             logger.error(f"Error getting pairs info: {str(e)}")
             return []
-
 
     async def get_best_pair(self, contract_address: str) -> List[Dict[str, Any]]:
         try:
@@ -458,7 +655,7 @@ class DataCenter:
             return None
 
 
-    async def get_latest_txs_with_logs(self, address_list: List[str], chain: str = 'eth') -> List[Dict[str, Any]]:
+    async def get_txs_with_logs_at_block(self, block_number: int = -1, chain: str = 'eth') -> List[Dict[str, Any]]:
         try:
             chain_obj = get_chain_info(chain)
             if chain_obj.chainId == 1:
@@ -466,10 +663,10 @@ class DataCenter:
                 loop = asyncio.get_event_loop()
                 
                 # Get transactions and logs concurrently
-                block = await loop.run_in_executor(None, lambda: self.w3_client.eth.get_block("latest", full_transactions=True))
+                block = await loop.run_in_executor(None, lambda: self.w3_client.eth.get_block(block_number, full_transactions=True))
                 logs = await loop.run_in_executor(None, lambda: self.w3_client.eth.get_logs({
-                    'fromBlock': "latest",
-                    'toBlock': "latest"
+                    'fromBlock': block_number if block_number != -1 else "latest",
+                    'toBlock': block_number if block_number != -1 else "latest"
                 }))
                 
                 # Create a map of transaction hash to logs
@@ -492,9 +689,8 @@ class DataCenter:
                 
             else:
                 raise ValueError(f"Unsupported chain: {chain}")
-                
         except Exception as e:
-            logger.error(f"Error in get_latest_txs_with_logs: {str(e)}")
+            logger.error(f"Error in get_txs_with_logs_at_block: {str(e)}")
             return []
 
     async def get_latest_swap_txs(self, chain: str = 'ethereum') -> List[Dict[str, Any]]:
