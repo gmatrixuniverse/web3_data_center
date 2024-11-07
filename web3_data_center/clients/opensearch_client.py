@@ -32,8 +32,8 @@ class OpenSearchClient(BaseClient):
     async def test_connection(self) -> bool:
         try:
             info = await self.client.info()
-            logger.info(f"Successfully connected to OpenSearch cluster: {info['cluster_name']}")
-            logger.info(f"OpenSearch version: {info['version']['number']}")
+            # logger.info(f"Successfully connected to OpenSearch cluster: {info['cluster_name']}")
+            # logger.info(f"OpenSearch version: {info['version']['number']}")
             return True
         except Exception as e:
             logger.error(f"Failed to connect to OpenSearch: {e}")
