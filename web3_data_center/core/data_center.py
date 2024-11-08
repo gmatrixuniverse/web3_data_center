@@ -563,14 +563,6 @@ class DataCenter:
             logger.error(f"Error reconstructing order from log: {str(e)}")
             return None
 
-    async def get_tx_y_hash(self, tx_hash: str) -> Dict[str, Any]:
-        try:
-            tx = await self.w3_client.eth.get_transaction(tx_hash)
-            return tx
-        except Exception as e:
-            logger.error(f"Error getting tx by hash: {str(e)}")
-            return None
-
     async def get_tx_with_logs_by_hash(self, tx_hash: str, return_dict: bool = True) -> Dict[str, Any]:
         try:
             # logger.info(f"getting tx with logs by hash: {tx_hash}")
