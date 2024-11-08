@@ -458,7 +458,7 @@ class DataCenter:
                 raise ValueError(f"Unsupported chain: {chain}")
                 
         except Exception as e:
-            logger.error(f"Error getting latest swap orders: {str(e)}")
+            logger.error(f"Error getting token pair orders at block: {str(e)}")
             return []
 
     async def get_token_pair_orders_between(self, token_contract: str, pair_address: str, block_start: int = 0, block_end: int = 99999999, chain: str = 'eth') -> List[Dict[str, Any]]:
@@ -470,7 +470,7 @@ class DataCenter:
                 logs = self.w3_client.eth.get_logs({
                     'fromBlock': block_start,
                     'toBlock': block_end,
-                    'address': pair_address,
+                    'address': self.w3_client.toChecksumAddress(pair_address),
                     'topics': [
                         [UNI_V2_SWAP_TOPIC, UNI_V3_SWAP_TOPIC]
                     ]
@@ -485,7 +485,7 @@ class DataCenter:
                 raise ValueError(f"Unsupported chain: {chain}")
                 
         except Exception as e:
-            logger.error(f"Error getting latest swap orders: {str(e)}")
+            logger.error(f"Error getting latest pair orders: {str(e)}")
             return []
 
     async def reconstruct_orders_from_logs(self, logs: List[Dict[str, Any]], token_contract: str) -> List[Dict[str, Any]]:
@@ -501,9 +501,10 @@ class DataCenter:
 
     async def reconstruct_order_from_log(self, log: Dict[str, Any], token_contract: str) -> Dict[str, Any]:
         try:
-            # logger.info("reconstructing order from log")
+            # logger.info(f"reconstructing order from log + {log}")
             tx = await self.get_tx_with_logs_by_log(log)
-            # logger.info("here is tx: ", tx, "and log: ", log)
+            # logger.info(f"here is tx: {tx}")
+
             analysis = self.analyzer.analyze_transaction(tx)
             pair = log['address'].lower()
             side = "Sell" if analysis['balance_analysis'][pair][token_contract.lower()] > 0 else "Buy"
@@ -544,9 +545,9 @@ class DataCenter:
                     receiver = tx['to']
                 else:
                     receiver = addresses_with_max[0]
-            print("check tx", tx)
+            # print("check tx", tx)
             order = {
-                'timestamp': tx['blockTimestamp'],
+                'timestamp': int(tx['blockTimestamp'], 16),
                 'trader': tx['from'],
                 'receiver': receiver,
                 'token': token_contract,

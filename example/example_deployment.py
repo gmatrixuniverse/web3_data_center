@@ -20,11 +20,12 @@ async def main():
     # Initialize DataCenter
     data_center = DataCenter()
     try:
-        token_contract = '0x2025bf4e0c1117685b1bf2ea2be56c7deb11bc99'
+        token_contract = '0x240cd7b53d364a208ed41f8ced4965d11f571b7a'
         deployed_block = await data_center.get_deployed_block(token_contract)
-        pair_address = '0xBF36AbDf1ac7536adC354FB5A0DeDb4C155520d3'
-        orders = await data_center.get_token_pair_orders_between(token_contract, pair_address, deployed_block, deployed_block+10000)
         logger.info(deployed_block)
+
+        pair_address = '0x7eb6d3466600b4857eb60a19e0d2115e65aa815e'
+        orders = await data_center.get_token_pair_orders_between(token_contract, pair_address, deployed_block, deployed_block+200)
         logger.info(orders)
 
         # pairs = await data_center.get_pairs_info(token_contract)
