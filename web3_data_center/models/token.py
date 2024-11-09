@@ -1,7 +1,6 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from typing import Optional, List, NamedTuple
 from datetime import datetime
-
 @dataclass
 class Token:
     address: str
@@ -49,6 +48,14 @@ class Token:
     def from_solscan(cls, data: dict) -> 'Token':
         # Implement conversion from Solscan API data to Token
         pass
+
+    # serialize to dict
+    def to_dict(self):
+        data = asdict(self)
+        # Convert datetime to ISO format string
+        if isinstance(self.created_at, datetime):
+            data['created_at'] = self.created_at.isoformat()
+        return data
 
 class RankedToken(NamedTuple):
     token: Token

@@ -517,7 +517,7 @@ class DataCenter:
                 }
                 max_token_amount = max(token_balances.values())
                 addresses_with_max = [
-                    addr for addr, amount in token_balances.items() 
+                    addr for addr, amount in token_balances.items()
                     if amount == max_token_amount
                 ]
                 
