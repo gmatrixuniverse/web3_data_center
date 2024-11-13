@@ -10,7 +10,7 @@ import datetime
 from chain_index import get_chain_info
 from evm_decoder.utils.abi_utils import is_pair_swap
 from evm_decoder.utils.constants import UNI_V2_SWAP_TOPIC, UNI_V3_SWAP_TOPIC
-from evm_decoder import DecoderManager, AnalyzerManager
+from evm_decoder import DecoderManager, AnalyzerManager, ContractManager
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from web3 import Web3
 logger = get_logger(__name__)
@@ -27,6 +27,7 @@ class DataCenter:
         self.etherscan_client = EtherscanClient(config_path=config_path)
         self.opensearch_client = OpenSearchClient(config_path=config_path)
         self.w3_client = Web3(Web3.HTTPProvider("http://192.168.0.105:8545"))
+        self.contract_manager = ContractManager("http://192.168.0.105:8545")
         self.analyzer  = AnalyzerManager()
         self.decoder = DecoderManager()
 
@@ -614,6 +615,29 @@ class DataCenter:
             return tx
         except Exception as e:
             logger.error(f"Error getting tx with logs by log: {str(e)}")
+            return None
+
+    async def is_pair_rugged(self, pair_address: str, pair_type: str = 'uni_v2', chain: str = 'eth') -> bool:
+        try:
+            # use web3 to check if the pair's reserve is rugged
+            if pair_type == 'uni_v2':
+                reserves = self.contract_manager.read_contract(
+                    contract_type=pair_type,
+                    address=pair_address,
+                    method='getReserves'
+                )
+                return reserves[0] < 10 or reserves[1] < 10
+
+            elif pair_type == 'uni_v3':
+                liquidity = self.contract_manager.read_contract(
+                    contract_type=pair_type,
+                    address=pair_address,
+                    method='liquidity'
+                )
+                return liquidity == 0
+            return False
+        except Exception as e:
+            logger.error(f"Error checking pair rugged: {str(e)}")
             return None
 
     async def get_tx_with_logs_by_log(self, log: Dict[str, Any], chain: str = 'eth') -> Dict[str, Any]:
