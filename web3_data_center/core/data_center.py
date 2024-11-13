@@ -7,7 +7,7 @@ from ..models.price_history_point import PriceHistoryPoint
 from ..utils.logger import get_logger
 import time
 import datetime
-from chain_index import get_chain_info
+from chain_index import get_chain_info, get_all_chain_tokens
 from evm_decoder.utils.abi_utils import is_pair_swap
 from evm_decoder.utils.constants import UNI_V2_SWAP_TOPIC, UNI_V3_SWAP_TOPIC
 from evm_decoder import DecoderManager, AnalyzerManager, ContractManager
@@ -389,6 +389,22 @@ class DataCenter:
         self.cache[cache_key] = token_security
         return token_security
 
+    async def has_code(self, address: str, chain: str = 'eth') -> bool:
+        return self.w3_client.eth.get_code(address) != b''
+
+    async def calculate_all_pair_addresses(self, token_contract: str, chain: str = 'eth'):
+        w3 = Web3()
+        tokens = get_all_chain_tokens(chain).get_all_tokens()
+        pair_addresses = []
+        for token_symbol, token_info in tokens.items():
+            for dex_type in ['uniswap_v2', 'uniswap_v3']:
+                pair_address = await self.calculate_pair_address(token_contract, token_info.contract, dex_type)   
+                if await self.has_code(pair_address):
+                    pair_addresses.append({
+                        'dex_type': dex_type,
+                        'pair_address': pair_address
+                    })
+        return pair_addresses
 
     async def calculate_pair_address(self, tokenA, tokenB, dex_type='uniswap_v2', fee=None):
         w3 = Web3()
@@ -617,10 +633,10 @@ class DataCenter:
             logger.error(f"Error getting tx with logs by log: {str(e)}")
             return None
 
-    async def is_pair_rugged(self, pair_address: str, pair_type: str = 'uni_v2', chain: str = 'eth') -> bool:
+    async def is_pair_rugged(self, pair_address: str, pair_type: str = 'uniswap_v2', chain: str = 'eth') -> bool:
         try:
             # use web3 to check if the pair's reserve is rugged
-            if pair_type == 'uni_v2':
+            if pair_type == 'uniswap_v2':
                 reserves = self.contract_manager.read_contract(
                     contract_type=pair_type,
                     address=pair_address,
@@ -628,7 +644,7 @@ class DataCenter:
                 )
                 return reserves[0] < 10 or reserves[1] < 10
 
-            elif pair_type == 'uni_v3':
+            elif pair_type == 'uniswap_v3':
                 liquidity = self.contract_manager.read_contract(
                     contract_type=pair_type,
                     address=pair_address,
@@ -638,6 +654,19 @@ class DataCenter:
             return False
         except Exception as e:
             logger.error(f"Error checking pair rugged: {str(e)}")
+            return None
+
+    async def is_token_rugged(self, token_contract: str, chain: str = 'eth') -> bool:
+        try:
+            # use web3 to check if the pair's reserve is rugged
+            pair_address_list = await self.calculate_all_pair_addresses(token_contract, chain)
+            for pair_address in pair_address_list:
+                print("checking pair", pair_address)
+                if await self.is_pair_rugged(pair_address['pair_address'], pair_address['dex_type'], chain):
+                    return True
+            return False
+        except Exception as e:
+            logger.error(f"Error checking token rugged: {str(e)}")
             return None
 
     async def get_tx_with_logs_by_log(self, log: Dict[str, Any], chain: str = 'eth') -> Dict[str, Any]:
