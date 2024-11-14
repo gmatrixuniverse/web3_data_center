@@ -119,3 +119,5 @@ config.yml
 tokens.csv
 contracts.csv
 contract_metrics.csv
+tokens_with_50plus_initial_snipers.csv
+tokens.csv

@@ -642,7 +642,30 @@ class DataCenter:
                     address=pair_address,
                     method='getReserves'
                 )
-                return reserves[0] < 10 or reserves[1] < 10
+                token0 = self.contract_manager.read_contract(
+                    contract_type=pair_type,
+                    address=pair_address,
+                    method='token0'
+                )
+                token1 = self.contract_manager.read_contract(
+                    contract_type=pair_type,
+                    address=pair_address,
+                    method='token1'
+                )
+                alternative_tokens = get_all_chain_tokens(chain).get_all_tokens()
+                # calculate value if token0(token1) is alternative token
+                token0_value = 0
+                token1_value = 0
+                
+                # Find matching alternative token by contract address
+                for alt_token in alternative_tokens.values():
+                    if token0.lower() == alt_token.contract.lower():
+                        token0_value = reserves[0] / 10 ** alt_token.decimals * alt_token.price_usd
+                    if token1.lower() == alt_token.contract.lower():
+                        token1_value = reserves[1] / 10 ** alt_token.decimals * alt_token.price_usd
+
+                logger.info(f"token0_value: {token0_value}, token1_value: {token1_value}")
+                return token0_value + token1_value < 100
 
             elif pair_type == 'uniswap_v3':
                 liquidity = self.contract_manager.read_contract(
@@ -656,7 +679,7 @@ class DataCenter:
             logger.error(f"Error checking pair rugged: {str(e)}")
             return None
 
-    async def is_token_rugged(self, token_contract: str, chain: str = 'eth') -> bool:
+    async def is_token_rugged(self, token_contract: str, chain: str = '1') -> bool:
         try:
             # use web3 to check if the pair's reserve is rugged
             pair_address_list = await self.calculate_all_pair_addresses(token_contract, chain)

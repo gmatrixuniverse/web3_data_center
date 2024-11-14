@@ -17,19 +17,28 @@ async def main():
     data_center = DataCenter()
 
     try:
+        # Read the CSV file
+        df = pd.read_csv('tokens_with_50plus_initial_snipers.csv')
         w3 = Web3()
-        # pair_address = w3.to_checksum_address('0x522CB9ACE84961057dC63D29d64ad371201bCAe1')
-        # rugged_pairs = await data_center.is_pair_rugged(pair_address=pair_address, pair_type='uni_v2', chain='eth')
-        # logger.info(f"Rugged Pairs: {rugged_pairs}")
-        token_contract = '0xf35Dd7F8fEB9f5CFc43F8F6F340e787dB33AbEdf'
-        rugged_tokens = await data_center.is_token_rugged(token_contract, 1)
-        logger.info(f"Rugged Tokens: {rugged_tokens}")
+
+        # Process each token
+        # for index, row in df.iterrows():
+        #     token_address = w3.to_checksum_address(row['token_address'])
+        #     try:
+        #         rugged_status = await data_center.is_token_rugged(token_address, chain=1)
+        #         logger.info(f"Token {token_address}: Rugged Status = {rugged_status}")
+        #     except Exception as e:
+        #         logger.error(f"Error processing token {token_address}: {str(e)}")
+        #         continue
+        status = await data_center.is_token_rugged(token_contract='0x4407340222823c57B2dE6843dc169Adb7fba2a1D', chain=1)
+        logger.info(f"Token: Rugged Status = {status}")
 
     except Exception as e:
         logger.error(f"An error occurred: {str(e)}")
     finally:
         # Close the DataCenter
         await data_center.close()
+
 
 if __name__ == "__main__":
     asyncio.run(main())
