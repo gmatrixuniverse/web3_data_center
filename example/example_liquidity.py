@@ -30,7 +30,7 @@ async def main():
         #     except Exception as e:
         #         logger.error(f"Error processing token {token_address}: {str(e)}")
         #         continue
-        status = await data_center.is_token_rugged(token_contract='0x4407340222823c57B2dE6843dc169Adb7fba2a1D', chain=1)
+        status = await data_center.is_token_rugged(token_contract='0xF20a060E70450FB6a2b92Eab534952535112daee', chain=1)
         logger.info(f"Token: Rugged Status = {status}")
 
     except Exception as e:

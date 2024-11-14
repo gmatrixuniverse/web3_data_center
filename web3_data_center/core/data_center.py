@@ -664,7 +664,7 @@ class DataCenter:
                     if token1.lower() == alt_token.contract.lower():
                         token1_value = reserves[1] / 10 ** alt_token.decimals * alt_token.price_usd
 
-                logger.info(f"token0_value: {token0_value}, token1_value: {token1_value}")
+                # logger.info(f"token0_value: {token0_value}, token1_value: {token1_value}")
                 return token0_value + token1_value < 100
 
             elif pair_type == 'uniswap_v3':
@@ -684,7 +684,6 @@ class DataCenter:
             # use web3 to check if the pair's reserve is rugged
             pair_address_list = await self.calculate_all_pair_addresses(token_contract, chain)
             for pair_address in pair_address_list:
-                print("checking pair", pair_address)
                 if await self.is_pair_rugged(pair_address['pair_address'], pair_address['dex_type'], chain):
                     return True
             return False
