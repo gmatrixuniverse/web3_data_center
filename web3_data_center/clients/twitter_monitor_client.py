@@ -18,13 +18,13 @@ class TwitterMonitorClient(BaseClient):
         })
         self.initialization_time: Optional[datetime] = None
         self.last_check_time: Optional[datetime] = None
-        self.user_auth_token: Optional[str] = None
-        self.list_id: Optional[str] = None
-        self.add_route: Optional[str] = None
-        self.remove_route: Optional[str] = None
-        self.list_route: Optional[str] = None
-        self.timeline_route: Optional[str] = None
-        self.query_id: Optional[str] = None
+        self.user_auth_token = self.config['api']['x']['auth_token']
+        self.list_id = self.config['api']['x']['list_id']
+        self.add_route = self.config['api']['x']['add_route']
+        self.remove_route = self.config['api']['x']['remove_route']
+        self.list_route = self.config['api']['x']['list_route']
+        self.timeline_route = self.config['api']['x']['timeline_route']
+        self.query_id = self.config['api']['x']['query_id']
 
     def set_parameters(self, **kwargs):
         for key, value in kwargs.items():
@@ -397,6 +397,7 @@ class TwitterMonitorClient(BaseClient):
         return since_date.strftime('%Y-%m-%d'), today.strftime('%Y-%m-%d')
     
     async def initialize_list_members(self):
+        print(f"Initializing list members for {self.list_id}, with {self.list_route}")
         endpoint = f"/graphql/{self.list_route}/ListMembers"
         variables = {
             "listId": self.list_id,
