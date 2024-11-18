@@ -187,6 +187,17 @@ class TwitterMonitorClient(BaseClient):
                                     self.processed_tweets.append(tweet_id)
                                     legacy = tweet.get('legacy', {})
                                     user = tweet.get('core', {}).get('user_results', {}).get('result', {}).get('legacy', {})
+                                                                        # Get the tweet text and URLs
+                                    text = legacy.get('full_text', '')
+                                    urls = legacy.get('entities', {}).get('urls', [])
+                                    
+                                    # Replace shortened URLs with expanded ones
+                                    for url in urls:
+                                        short_url = url.get('url', '')
+                                        expanded_url = url.get('expanded_url', '')
+                                        if short_url and expanded_url:
+                                            text = text.replace(short_url, expanded_url)
+                                    
                                     new_post = {
                                         'id': tweet_id,
                                         'text': legacy.get('full_text'),
