@@ -182,7 +182,7 @@ class TwitterMonitorClient(BaseClient):
                                 if tweet_id is None:
                                     continue
                                 created_at = datetime.strptime(tweet.get('legacy', {}).get('created_at', 'Tue Sep 03 23:22:54 +0000 2024'), '%a %b %d %H:%M:%S +0000 %Y').replace(tzinfo=timezone.utc)
-                                print(created_at, self.initialization_time, tweet_id)
+                                # print(created_at, self.initialization_time, tweet_id)
                                 if created_at > self.last_check_time and tweet_id not in self.processed_tweets:
                                     self.processed_tweets.append(tweet_id)
                                     legacy = tweet.get('legacy', {})
@@ -193,8 +193,9 @@ class TwitterMonitorClient(BaseClient):
                                         'user': user.get('screen_name'),
                                         'created_at': created_at
                                     }
-                                    new_posts.append(tweet_id)
+                                    new_posts.append(new_post)
                                     logger.debug(f"New post added: {new_post}")
+                                    self.last_check_time = current_time
             else:
                 logger.error("Failed to fetch new posts.")
             
@@ -203,7 +204,6 @@ class TwitterMonitorClient(BaseClient):
             logger.error(f"Error checking for new posts: {str(e)}")
             logger.exception("Exception details:")
         
-        self.last_check_time = current_time
         return new_posts
 
     def _parse_search_results(self, data):
@@ -276,7 +276,7 @@ class TwitterMonitorClient(BaseClient):
         
         try:
             data = await self._make_request(method="GET", endpoint=endpoint, params=params)
-            print(data)
+            # print(data)
             user_data = data.get('data', {}).get('user', {}).get('result', {})
             user_id = user_data.get('rest_id')
             if user_id:
