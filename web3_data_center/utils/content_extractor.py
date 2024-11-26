@@ -23,9 +23,9 @@ class ExtractedData:
     tweets: Set[str] = field(default_factory=set)
 
 class ContentExtractor:
-    def __init__(self, http_client: aiohttp.ClientSession):
+    def __init__(self, http_client: aiohttp.ClientSession, use_proxy=False):
         from web3_data_center.clients.twitter_monitor_client import TwitterMonitorClient
-        self.twitter_client = TwitterMonitorClient()
+        self.twitter_client = TwitterMonitorClient(use_proxy=use_proxy)
         self.http_client = http_client
         self.contract_pattern = re.compile(r'\b(?:0x[a-fA-F0-9]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})\b')
         self.ticker_pattern = re.compile(r'\$[A-Za-z]{2,}')

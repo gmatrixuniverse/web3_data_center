@@ -5,7 +5,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name='web3_data_center',
-    version='0.4.7',
+    version='0.5.0',
     description='Web3 data center integrating multiple APIs for blockchain data analysis',
     long_description=long_description,
     long_description_content_type='text/markdown',

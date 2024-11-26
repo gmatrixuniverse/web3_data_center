@@ -200,7 +200,7 @@ class TwitterMonitorClient(BaseClient):
                                     
                                     new_post = {
                                         'id': tweet_id,
-                                        'text': legacy.get('full_text'),
+                                        'text': text,
                                         'user': user.get('screen_name'),
                                         'created_at': created_at
                                     }
