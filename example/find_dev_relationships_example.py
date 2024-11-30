@@ -21,12 +21,12 @@ async def main():
         dev_address  # Include dev address itself to test filtering
     ]
     
-    print(f"\nFinding funding relationships between dev address and targets:")
+    print(f"\nFinding closest funding relationships between dev address and targets:")
     print(f"Developer: {dev_address}")
     print(f"Targets: {', '.join(target_addresses)}")
     
     # First try without minimum depth requirement
-    print("\n1. All funding relationships:")
+    print("\n1. All closest funding relationships:")
     relationships = await data_center.find_dev_funding_relationships(
         dev_address,
         target_addresses
@@ -34,22 +34,20 @@ async def main():
     
     if relationships:
         print("\nFound relationships:")
-        for target, common_funders in relationships.items():
+        for target, rel in relationships.items():
             print(f"\nTarget: {target}")
-            print(f"Number of common funders: {len(common_funders)}")
-            for i, rel in enumerate(common_funders, 1):
-                print(f"\nCommon Funder {i}:")
-                print(f"└─ Address: {rel['common_funder']}")
-                print(f"└─ Depth in dev path: {rel['dev_depth']}")
-                print(f"└─ Depth in target path: {rel['target_depth']}")
-                print(f"└─ Dev tx: {rel['dev_tx']}")
-                print(f"└─ Target tx: {rel['target_tx']}")
+            print(f"└─ Closest Common Funder: {rel['common_funder']}")
+            print(f"└─ Depth in dev path: {rel['dev_depth']}")
+            print(f"└─ Depth in target path: {rel['target_depth']}")
+            print(f"└─ Total depth: {rel['dev_depth'] + rel['target_depth']}")
+            print(f"└─ Dev tx: {rel['dev_tx']}")
+            print(f"└─ Target tx: {rel['target_tx']}")
     else:
         print("No relationships found")
     
     # Try again with minimum depth requirement
     min_depth = 3
-    print(f"\n2. Relationships with minimum depth {min_depth}:")
+    print(f"\n2. Closest relationships with minimum depth {min_depth}:")
     relationships = await data_center.find_dev_funding_relationships(
         dev_address,
         target_addresses,
@@ -58,16 +56,14 @@ async def main():
     
     if relationships:
         print("\nFound relationships:")
-        for target, common_funders in relationships.items():
+        for target, rel in relationships.items():
             print(f"\nTarget: {target}")
-            print(f"Number of common funders: {len(common_funders)}")
-            for i, rel in enumerate(common_funders, 1):
-                print(f"\nCommon Funder {i}:")
-                print(f"└─ Address: {rel['common_funder']}")
-                print(f"└─ Depth in dev path: {rel['dev_depth']}")
-                print(f"└─ Depth in target path: {rel['target_depth']}")
-                print(f"└─ Dev tx: {rel['dev_tx']}")
-                print(f"└─ Target tx: {rel['target_tx']}")
+            print(f"└─ Closest Common Funder: {rel['common_funder']}")
+            print(f"└─ Depth in dev path: {rel['dev_depth']}")
+            print(f"└─ Depth in target path: {rel['target_depth']}")
+            print(f"└─ Total depth: {rel['dev_depth'] + rel['target_depth']}")
+            print(f"└─ Dev tx: {rel['dev_tx']}")
+            print(f"└─ Target tx: {rel['target_tx']}")
     else:
         print("No relationships found with minimum depth requirement")
 

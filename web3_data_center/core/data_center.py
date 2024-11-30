@@ -1165,10 +1165,10 @@ class DataCenter:
         target_addresses: List[str],
         max_depth: int = 100,
         min_common_depth: Optional[int] = None
-    ) -> Dict[str, List[Dict[str, Any]]]:
+    ) -> Dict[str, Dict[str, Any]]:
         """
         Find addresses from the target list that have funding relationships with a developer address.
-        For each target address, it will find all common funders with the dev address, not just the first one.
+        For each target address, it will find the closest common funder with the dev address.
         
         Args:
             dev_address: The developer's address to check relationships against
@@ -1179,23 +1179,22 @@ class DataCenter:
                             this many levels deep in both paths.
             
         Returns:
-            Dict[str, List[Dict[str, Any]]]: Dictionary mapping target addresses to their relationships:
-                - target_address -> list of relationships, where each relationship contains:
-                    - common_funder: The common funder's address
+            Dict[str, Dict[str, Any]]: Dictionary mapping target addresses to their relationship:
+                - target_address -> relationship info containing:
+                    - common_funder: The closest common funder's address
                     - dev_depth: Depth of common funder in dev's path
                     - target_depth: Depth of common funder in target's path
                     - dev_tx: Transaction hash from common funder in dev's path
                     - target_tx: Transaction hash from common funder in target's path
-                Only includes addresses that have at least one relationship.
+                Only includes addresses that have a relationship.
         """
         try:
-            # Get dev address funding path first
+            # Get dev's funding path first
             dev_path = await self.get_funding_path(dev_address, max_depth)
             if not dev_path:
-                logger.warning(f"No funding path found for dev address {dev_address}")
                 return {}
 
-            # Create a map of funder -> funding info for dev path
+            # Create lookup dict for dev's funders with their depths
             dev_funders = {step["address"]: step for step in dev_path}
 
             # Store relationships for addresses that have them
@@ -1210,8 +1209,10 @@ class DataCenter:
                 if not target_path:
                     continue
 
-                # Find all common funders between dev and target
-                common_funders = []
+                # Find the closest common funder between dev and target
+                closest_relationship = None
+                closest_total_depth = float('inf')
+
                 for target_step in target_path:
                     funder = target_step["address"]
                     if funder in dev_funders:
@@ -1222,17 +1223,21 @@ class DataCenter:
                             if dev_step["depth"] < min_common_depth or target_step["depth"] < min_common_depth:
                                 continue
 
-                        common_funders.append({
-                            "common_funder": funder,
-                            "dev_depth": dev_step["depth"],
-                            "target_depth": target_step["depth"],
-                            "dev_tx": dev_step["tx_hash"],
-                            "target_tx": target_step["tx_hash"]
-                        })
+                        # Calculate total depth to find closest common funder
+                        total_depth = dev_step["depth"] + target_step["depth"]
+                        if total_depth < closest_total_depth:
+                            closest_total_depth = total_depth
+                            closest_relationship = {
+                                "common_funder": funder,
+                                "dev_depth": dev_step["depth"],
+                                "target_depth": target_step["depth"],
+                                "dev_tx": dev_step["tx_hash"],
+                                "target_tx": target_step["tx_hash"]
+                            }
 
-                # If we found any relationships, add them to the results
-                if common_funders:
-                    relationships[target] = common_funders
+                # If we found a relationship, add it to the results
+                if closest_relationship:
+                    relationships[target] = closest_relationship
 
             return relationships
 
