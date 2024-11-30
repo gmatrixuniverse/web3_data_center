@@ -26,6 +26,7 @@ class DataCenter:
         self.chainbase_client = ChainbaseClient(config_path=config_path)
         self.etherscan_client = EtherscanClient(config_path=config_path)
         self.opensearch_client = OpenSearchClient(config_path=config_path)
+        self.funding_client = FundingClient(config_path=config_path)
         self.w3_client = Web3(Web3.HTTPProvider("http://192.168.0.105:8545"))
         self.contract_manager = ContractManager("http://192.168.0.105:8545")
         self.analyzer  = AnalyzerManager()
@@ -462,7 +463,16 @@ class DataCenter:
         try:
             chain_obj = get_chain_info(chain)
             if chain_obj.chainId == 1:
-                logs = await self.get_logs_at_block(block_number, chain, [pair_address])
+                # Use loop.run_in_executor for blocking Web3 calls
+                loop = asyncio.get_event_loop()
+                logs = await loop.run_in_executor(None, lambda: self.w3_client.eth.get_logs({
+                    'fromBlock': block_number,
+                    'toBlock': block_number,
+                    'address': self.w3_client.toChecksumAddress(pair_address),
+                    'topics': [
+                        [UNI_V2_SWAP_TOPIC, UNI_V3_SWAP_TOPIC]
+                    ]
+                }))
                 for log in logs:
                     if is_pair_swap(log):
                         orders = self.reconstruct_order_from_log(log,token_contract)
@@ -484,14 +494,16 @@ class DataCenter:
         try:
             chain_obj = get_chain_info(chain)
             if chain_obj.chainId == 1:
-                logs = self.w3_client.eth.get_logs({
+                # Use loop.run_in_executor for blocking Web3 calls
+                loop = asyncio.get_event_loop()
+                logs = await loop.run_in_executor(None, lambda: self.w3_client.eth.get_logs({
                     'fromBlock': block_start,
                     'toBlock': block_end,
                     'address': self.w3_client.toChecksumAddress(pair_address),
                     'topics': [
                         [UNI_V2_SWAP_TOPIC, UNI_V3_SWAP_TOPIC]
                     ]
-                })
+                }))
                 # logger.info(logs)
                 swap_orders = await self.reconstruct_orders_from_logs(logs,token_contract)
                 return swap_orders
@@ -587,8 +599,10 @@ class DataCenter:
 
             if isinstance(tx_hash, bytes):
                 tx_hash = tx_hash.hex()
-            tx = self.w3_client.eth.get_transaction(tx_hash)
-            receipt = self.w3_client.eth.get_transaction_receipt(tx_hash)
+            # Use loop.run_in_executor for blocking Web3 calls
+            loop = asyncio.get_event_loop()
+            tx = await loop.run_in_executor(None, lambda: self.w3_client.eth.get_transaction(tx_hash))
+            receipt = await loop.run_in_executor(None, lambda: self.w3_client.eth.get_transaction_receipt(tx_hash))
 
             if tx is None or receipt is None:
                 logger.error("Transaction or receipt not found")
@@ -722,6 +736,509 @@ class DataCenter:
             logger.error(f"Error getting best pair: {str(e)}")
             return None
 
+
+    async def get_funder_address(self, address: str) -> Optional[str]:
+        """
+        Get the funder's address for a given address by:
+        1. Getting the funding transaction hash from the funding service
+        2. Querying the transaction details to get the 'from' address (funder)
+        
+        Args:
+            address: The address to find the funder for
+            
+        Returns:
+            Optional[str]: The funder's address if found, None otherwise
+        """
+        try:
+            # Get funding transaction hash
+            funding_result = await self.funding_client.simulate_view_first_fund(address)
+            
+            if not funding_result or 'result' not in funding_result:
+                logger.error(f"No funding transaction found for address {address}")
+                return None
+            print(funding_result['result'])
+            tx_hash = funding_result['result']['TxnHash']
+            if not tx_hash:
+                logger.error(f"Empty transaction hash returned for address {address}")
+                return None
+            
+            # Get transaction details using web3
+            tx = self.w3_client.eth.get_transaction(tx_hash)
+            if not tx:
+                logger.error(f"Could not find transaction {tx_hash}")
+                return None
+                
+            return tx['from']
+            
+        except Exception as e:
+            logger.error(f"Error getting funder address for {address}: {str(e)}")
+            return None
+
+    async def get_funder_addresses(self, addresses: List[str]) -> Dict[str, Optional[str]]:
+        """
+        Get the funder's addresses for a list of addresses by:
+        1. Getting the funding transaction hashes in batch from the funding service
+        2. Querying the transaction details to get the 'from' addresses (funders)
+        
+        Args:
+            addresses: List of addresses to find the funders for
+            
+        Returns:
+            Dict[str, Optional[str]]: Dictionary mapping each input address to its funder's address
+        """
+        try:
+            # Get funding transaction hashes in batch
+            funding_results = await self.funding_client.batch_simulate_view_first_fund(addresses)
+            
+            if not funding_results:
+                logger.error("No funding transactions found")
+                return {addr: None for addr in addresses}
+
+            # Process results and get transaction details
+            funder_map = {}
+            for addr, result in zip(addresses, funding_results):
+                try:
+                    if not result or 'result' not in result:
+                        logger.error(f"No funding transaction found for address {addr}")
+                        funder_map[addr] = None
+                        continue
+
+                    tx_hash = result['result']['TxnHash']
+                    if not tx_hash:
+                        logger.error(f"Empty transaction hash returned for address {addr}")
+                        funder_map[addr] = None
+                        continue
+
+                    # Get transaction details using web3
+                    tx = self.w3_client.eth.get_transaction(tx_hash)
+                    if not tx:
+                        logger.error(f"Could not find transaction {tx_hash}")
+                        funder_map[addr] = None
+                        continue
+
+                    funder_map[addr] = tx['from']
+
+                except Exception as e:
+                    logger.error(f"Error processing address {addr}: {str(e)}")
+                    funder_map[addr] = None
+
+            return funder_map
+            
+        except Exception as e:
+            logger.error(f"Error getting funder addresses: {str(e)}")
+            return {addr: None for addr in addresses}
+
+    async def get_funder_tree(self, addresses: List[str], max_depth: int = 3) -> Dict[str, Any]:
+        """
+        Recursively get the funder tree for given addresses up to a specified depth.
+        
+        Args:
+            addresses: List of addresses to find the funders for
+            max_depth: Maximum depth to traverse up the funding chain (default: 3)
+            
+        Returns:
+            Dict[str, Any]: Nested dictionary representing the funding tree where each level contains:
+                - funder: The funder's address
+                - funded_at: Transaction hash of the funding
+                - next_level: Recursive funding information for the funder (if within max_depth)
+        """
+        if max_depth <= 0 or not addresses:
+            return {}
+
+        try:
+            # Get funding information for current level
+            funding_results = await self.funding_client.batch_simulate_view_first_fund(addresses)
+            
+            if not funding_results:
+                logger.error(f"No funding results returned for addresses: {addresses}")
+                return {addr: None for addr in addresses}
+
+            # Process results and build tree
+            tree = {}
+            next_level_addresses = set()  # Using set to avoid duplicate funder addresses
+
+            # First pass: build current level and collect next level addresses
+            for addr, result in zip(addresses, funding_results):
+                try:
+                    if not result or 'result' not in result or not result['result']:
+                        logger.error(f"Invalid result for address {addr}: {result}")
+                        tree[addr] = None
+                        continue
+
+                    result_data = result['result']
+                    tx_hash = result_data.get('TxnHash')
+                    if not tx_hash:
+                        logger.error(f"No transaction hash found for address {addr}")
+                        tree[addr] = None
+                        continue
+
+                    # Try to get funder from API response first
+                    next_funder = result_data.get('From')
+                    
+                    if not next_funder:
+                        # Fallback to transaction lookup
+                        try:
+                            loop = asyncio.get_event_loop()
+                            tx = await loop.run_in_executor(None, self.w3_client.eth.get_transaction, tx_hash)
+                            if not tx:
+                                logger.error(f"No transaction found for hash {tx_hash}")
+                                tree[addr] = None
+                                continue
+                            next_funder = tx['from']
+                        except Exception as tx_error:
+                            logger.error(f"Error getting transaction {tx_hash}: {str(tx_error)}")
+                            tree[addr] = None
+                            continue
+
+                    tree[addr] = {
+                        "funder": next_funder,
+                        "funded_at": tx_hash,
+                        "next_level": {}  # Initialize as empty dict instead of None
+                    }
+                    next_level_addresses.add(next_funder)
+
+                except Exception as e:
+                    logger.error(f"Error processing address {addr}: {str(e)}")
+                    tree[addr] = None
+
+            # If we haven't reached max depth and have addresses to check, make recursive call
+            if max_depth > 1 and next_level_addresses:
+                next_level_results = await self.get_funder_tree(
+                    list(next_level_addresses),
+                    max_depth - 1
+                )
+                
+                # Attach next level results to tree
+                for addr in tree:
+                    if tree[addr]:
+                        funder = tree[addr]["funder"]
+                        if funder in next_level_results:
+                            tree[addr]["next_level"] = next_level_results
+
+            return tree
+        
+        except Exception as e:
+            logger.error(f"Error getting funder tree: {str(e)}")
+            return {addr: None for addr in addresses}
+
+    async def get_root_funder(self, address: str, max_depth: int = 100) -> Optional[Dict[str, Any]]:
+        """
+        Get the root funder (the earliest funder with no further funding source) for a given address.
+        This function will keep searching deeper until it finds an address with no funding source,
+        or until it reaches max_depth.
+        
+        Args:
+            address: The address to find the root funder for
+            max_depth: Maximum depth to prevent infinite loops (default: 20)
+            
+        Returns:
+            Optional[Dict[str, Any]]: Dictionary containing:
+                - address: The root funder's address
+                - tx_hash: The transaction hash that funded the previous address
+                - depth: How many levels deep we found this funder
+                - is_root: True if this is confirmed to be the root funder (no further funding found)
+            Returns None if no funding information is found
+        """
+        try:
+            current_address = address
+            current_depth = 0
+            last_tx_hash = None
+            
+            while current_depth < max_depth:
+                # Try to get next funder
+                result = await self.funding_client.simulate_view_first_fund(current_address)
+                
+                # If no funding info found, we've reached a root funder
+                if not result or 'result' not in result or not result['result']:
+                    if current_depth > 0:
+                        return {
+                            "address": current_address,
+                            "tx_hash": last_tx_hash,
+                            "depth": current_depth,
+                            "is_root": True  # Confirmed root as no further funding found
+                        }
+                    return None
+
+                result_data = result['result']
+                tx_hash = result_data.get('TxnHash')
+                if not tx_hash:
+                    if current_depth > 0:
+                        return {
+                            "address": current_address,
+                            "tx_hash": last_tx_hash,
+                            "depth": current_depth,
+                            "is_root": True  # No transaction hash means no further funding
+                        }
+                    return None
+
+                # Try to get funder from API response first
+                next_funder = result_data.get('From')
+                
+                if not next_funder:
+                    # Fallback to transaction lookup
+                    try:
+                        loop = asyncio.get_event_loop()
+                        tx = await loop.run_in_executor(None, self.w3_client.eth.get_transaction, tx_hash)
+                        if not tx:
+                            if current_depth > 0:
+                                return {
+                                    "address": current_address,
+                                    "tx_hash": last_tx_hash,
+                                    "depth": current_depth,
+                                    "is_root": True  # No transaction means no further funding
+                                }
+                            return None
+                        next_funder = tx['from']
+                    except Exception as tx_error:
+                        logger.error(f"Error getting transaction {tx_hash}: {str(tx_error)}")
+                        if current_depth > 0:
+                            return {
+                                "address": current_address,
+                                "tx_hash": last_tx_hash,
+                                "depth": current_depth,
+                                "is_root": False  # Error means we're not sure if this is root
+                            }
+                        return None
+
+                # Update for next iteration
+                last_tx_hash = tx_hash
+                current_address = next_funder
+                current_depth += 1
+
+            # If we reach max depth, return the last funder but indicate it might not be root
+            return {
+                "address": current_address,
+                "tx_hash": last_tx_hash,
+                "depth": current_depth,
+                "is_root": False  # Reached max depth, might not be actual root
+            }
+
+        except Exception as e:
+            logger.error(f"Error getting root funder for {address}: {str(e)}")
+            return None
+
+    async def get_root_funders(self, addresses: List[str], max_depth: int = 100) -> Dict[str, Optional[Dict[str, Any]]]:
+        """
+        Get the root funders (earliest funders with no further funding sources) for a list of addresses.
+        
+        Args:
+            addresses: List of addresses to find the root funders for
+            max_depth: Maximum depth to prevent infinite loops (default: 20)
+            
+        Returns:
+            Dict[str, Optional[Dict[str, Any]]]: Dictionary mapping input addresses to their root funder info.
+            Each root funder info contains:
+                - address: The root funder's address
+                - tx_hash: The transaction hash that funded the previous address
+                - depth: How many levels deep we found this funder
+                - is_root: True if this is confirmed to be the root funder
+        """
+        tasks = [self.get_root_funder(addr, max_depth) for addr in addresses]
+        results = await asyncio.gather(*tasks)
+        return dict(zip(addresses, results))
+
+    async def get_funding_path(self, address: str, max_depth: int = 100) -> List[Dict[str, Any]]:
+        """
+        Get the complete funding path for an address up to the root funder.
+        
+        Args:
+            address: The address to get the funding path for
+            max_depth: Maximum depth to search (default: 100)
+            
+        Returns:
+            List[Dict[str, Any]]: List of funding steps, each containing:
+                - address: The funder's address
+                - tx_hash: The transaction hash
+                - depth: The depth level of this funder
+        """
+        try:
+            path = []
+            current_address = address
+            current_depth = 0
+            
+            while current_depth < max_depth:
+                # Try to get next funder
+                result = await self.funding_client.simulate_view_first_fund(current_address)
+                
+                # If no funding info found, we've reached the end
+                if not result or 'result' not in result or not result['result']:
+                    break
+
+                result_data = result['result']
+                tx_hash = result_data.get('TxnHash')
+                if not tx_hash:
+                    break
+
+                # Try to get funder from API response first
+                next_funder = result_data.get('From')
+                if not next_funder:
+                    # Fallback to transaction lookup
+                    try:
+                        loop = asyncio.get_event_loop()
+                        tx = await loop.run_in_executor(None, self.w3_client.eth.get_transaction, tx_hash)
+                        if not tx:
+                            break
+                        next_funder = tx['from']
+                    except Exception as e:
+                        logger.error(f"Error getting transaction {tx_hash}: {str(e)}")
+                        break
+
+                # Add this step to the path
+                path.append({
+                    "address": next_funder,
+                    "tx_hash": tx_hash,
+                    "depth": current_depth + 1
+                })
+
+                # Move to next funder
+                current_address = next_funder
+                current_depth += 1
+
+            return path
+
+        except Exception as e:
+            logger.error(f"Error getting funding path for {address}: {str(e)}")
+            return []
+
+    async def check_funding_relationship(
+        self, 
+        address1: str, 
+        address2: str, 
+        max_depth: int = 100
+    ) -> Optional[Dict[str, Any]]:
+        """
+        Check if two addresses have a funding relationship by finding common funders
+        in their funding paths.
+        
+        Args:
+            address1: First address to check
+            address2: Second address to check
+            max_depth: Maximum depth to search in each path (default: 100)
+            
+        Returns:
+            Optional[Dict[str, Any]]: If a relationship is found, returns:
+                - common_funder: The common funder's address
+                - depth1: Depth of common funder in first address's path
+                - depth2: Depth of common funder in second address's path
+                - tx_hash1: Transaction hash from common funder to first path
+                - tx_hash2: Transaction hash from common funder to second path
+            Returns None if no relationship is found
+        """
+        try:
+            # Get funding paths for both addresses
+            path1 = await self.get_funding_path(address1, max_depth)
+            path2 = await self.get_funding_path(address2, max_depth)
+
+            # Create a map of address -> funding info for the first path
+            path1_map = {step["address"]: step for step in path1}
+
+            # Check each address in second path against first path
+            for step2 in path2:
+                common_funder = step2["address"]
+                if common_funder in path1_map:
+                    # Found a common funder
+                    step1 = path1_map[common_funder]
+                    
+                    # Check minimum depth requirement if specified
+                    if max_depth is not None:
+                        if step1["depth"] < max_depth or step2["depth"] < max_depth:
+                            continue
+
+                    return {
+                        "common_funder": common_funder,
+                        "depth1": step1["depth"],
+                        "depth2": step2["depth"],
+                        "tx_hash1": step1["tx_hash"],
+                        "tx_hash2": step2["tx_hash"]
+                    }
+
+            # No common funders found
+            return None
+
+        except Exception as e:
+            logger.error(f"Error checking funding relationship between {address1} and {address2}: {str(e)}")
+            return None
+
+    async def find_dev_funding_relationships(
+        self,
+        dev_address: str,
+        target_addresses: List[str],
+        max_depth: int = 100,
+        min_common_depth: Optional[int] = None
+    ) -> Dict[str, List[Dict[str, Any]]]:
+        """
+        Find addresses from the target list that have funding relationships with a developer address.
+        For each target address, it will find all common funders with the dev address, not just the first one.
+        
+        Args:
+            dev_address: The developer's address to check relationships against
+            target_addresses: List of addresses to check for relationships
+            max_depth: Maximum depth to search in each path (default: 100)
+            min_common_depth: Optional minimum depth for common funders. If set,
+                            only report relationships where the common funder is at least
+                            this many levels deep in both paths.
+            
+        Returns:
+            Dict[str, List[Dict[str, Any]]]: Dictionary mapping target addresses to their relationships:
+                - target_address -> list of relationships, where each relationship contains:
+                    - common_funder: The common funder's address
+                    - dev_depth: Depth of common funder in dev's path
+                    - target_depth: Depth of common funder in target's path
+                    - dev_tx: Transaction hash from common funder in dev's path
+                    - target_tx: Transaction hash from common funder in target's path
+                Only includes addresses that have at least one relationship.
+        """
+        try:
+            # Get dev address funding path first
+            dev_path = await self.get_funding_path(dev_address, max_depth)
+            if not dev_path:
+                logger.warning(f"No funding path found for dev address {dev_address}")
+                return {}
+
+            # Create a map of funder -> funding info for dev path
+            dev_funders = {step["address"]: step for step in dev_path}
+
+            # Store relationships for addresses that have them
+            relationships = {}
+
+            # Check each target address
+            for target in target_addresses:
+                if target == dev_address:
+                    continue  # Skip if target is the dev address itself
+
+                target_path = await self.get_funding_path(target, max_depth)
+                if not target_path:
+                    continue
+
+                # Find all common funders between dev and target
+                common_funders = []
+                for target_step in target_path:
+                    funder = target_step["address"]
+                    if funder in dev_funders:
+                        dev_step = dev_funders[funder]
+                        
+                        # Check minimum depth requirement if specified
+                        if min_common_depth is not None:
+                            if dev_step["depth"] < min_common_depth or target_step["depth"] < min_common_depth:
+                                continue
+
+                        common_funders.append({
+                            "common_funder": funder,
+                            "dev_depth": dev_step["depth"],
+                            "target_depth": target_step["depth"],
+                            "dev_tx": dev_step["tx_hash"],
+                            "target_tx": target_step["tx_hash"]
+                        })
+
+                # If we found any relationships, add them to the results
+                if common_funders:
+                    relationships[target] = common_funders
+
+            return relationships
+
+        except Exception as e:
+            logger.error(f"Error finding dev funding relationships: {str(e)}")
+            return {}
 
     async def get_txs_with_logs_at_block(self, block_number: int = -1, chain: str = 'eth') -> List[Dict[str, Any]]:
         try:

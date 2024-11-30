@@ -9,6 +9,8 @@ from .twitter_monitor_client import TwitterMonitorClient
 from .etherscan_client import EtherscanClient
 from .chainbase_client import ChainbaseClient
 from .opensearch_client import OpenSearchClient
+from .funding_client import FundingClient
+from .aml_client import AMLClient
 
 __all__ = [
     'BaseClient',
@@ -21,5 +23,7 @@ __all__ = [
     'TwitterMonitorClient',
     'EtherscanClient',
     'ChainbaseClient',
-    'OpenSearchClient'
+    'OpenSearchClient',
+    'FundingClient',
+    'AMLClient'
 ]

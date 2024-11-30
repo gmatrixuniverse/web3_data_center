@@ -159,6 +159,7 @@ class BaseClient:
 
         async with aiohttp.ClientSession(timeout=ClientTimeout(total=timeout)) as session:
             try:
+                # print(f"Making {method} request to {url} with headers {full_headers} and params {params}, data {data}")
                 async with session.request(
                     method=method.upper(),
                     url=url,
