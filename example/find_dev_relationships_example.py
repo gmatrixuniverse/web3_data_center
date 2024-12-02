@@ -17,7 +17,7 @@ async def main():
     target_addresses = [
         "0x5e809A85Aa182A9921EDD10a4163745bb3e36284",  # Address we checked before
         "0xf3D872b9E8d314820dc8E99DAfBe1A3FeEDc27D5",  # Another address
-        "0xf3D872b9E8d314820dc8E99DAfBe1A3FeEDc27D5",  # Third address
+        "0x441Bae4Cda3C6fECCFC98ADD2f2eD363d9ebc090",  # Third address
         dev_address  # Include dev address itself to test filtering
     ]
     

@@ -176,37 +176,35 @@ class TwitterMonitorClient(BaseClient):
                     if instruction.get('type') == 'TimelineAddEntries':
                         entries = instruction.get('entries', [])
                         for entry in entries:
-                            tweet = entry.get('content', {}).get('itemContent', {}).get('tweet_results', {}).get('result', {})
-                            if tweet:
-                                tweet_id = tweet.get('rest_id')
-                                if tweet_id is None:
-                                    continue
+                                tweet = entry.get('content', {}).get('itemContent', {}).get('tweet_results', {}).get('result', {})
+                                if tweet:
+                                    tweet_id = tweet.get('rest_id')
+                                    if tweet_id is None:
+                                        continue
                                 created_at = datetime.strptime(tweet.get('legacy', {}).get('created_at', 'Tue Sep 03 23:22:54 +0000 2024'), '%a %b %d %H:%M:%S +0000 %Y').replace(tzinfo=timezone.utc)
                                 # print(created_at, self.initialization_time, tweet_id)
                                 if created_at > self.last_check_time and tweet_id not in self.processed_tweets:
                                     self.processed_tweets.append(tweet_id)
                                     legacy = tweet.get('legacy', {})
                                     user = tweet.get('core', {}).get('user_results', {}).get('result', {}).get('legacy', {})
-                                                                        # Get the tweet text and URLs
+                                                                                # Get the tweet text and URLs
                                     text = legacy.get('full_text', '')
                                     urls = legacy.get('entities', {}).get('urls', [])
-                                    
-                                    # Replace shortened URLs with expanded ones
+                                            # Replace shortened URLs with expanded ones
                                     for url in urls:
                                         short_url = url.get('url', '')
                                         expanded_url = url.get('expanded_url', '')
                                         if short_url and expanded_url:
                                             text = text.replace(short_url, expanded_url)
-                                    
-                                    new_post = {
-                                        'id': tweet_id,
-                                        'text': text,
-                                        'user': user.get('screen_name'),
-                                        'created_at': created_at
-                                    }
-                                    new_posts.append(new_post)
-                                    logger.debug(f"New post added: {new_post}")
-                                    self.last_check_time = current_time
+                                            new_post = {
+                                                'id': tweet_id,
+                                                'text': text,
+                                                'user': user.get('screen_name'),
+                                                'created_at': created_at
+                                            }
+                                            new_posts.append(new_post)
+                                            logger.debug(f"New post added: {new_post}")
+                self.last_check_time = current_time
             else:
                 logger.error("Failed to fetch new posts.")
             
@@ -407,12 +405,15 @@ class TwitterMonitorClient(BaseClient):
         
         return since_date.strftime('%Y-%m-%d'), today.strftime('%Y-%m-%d')
     
-    async def initialize_list_members(self):
-        print(f"Initializing list members for {self.list_id}, with {self.list_route}")
+    async def get_list_members(self):
+        """Get the current members of the monitored Twitter list."""
+        if not self.list_route or not self.list_id:
+            raise ValueError("list_route or list_id not initialized")
+            
         endpoint = f"/graphql/{self.list_route}/ListMembers"
         variables = {
             "listId": self.list_id,
-            "count": 20,
+            "count": 100,  # Increased to get more members
             "withSafetyModeUserFields": True
         }
         features = {
@@ -448,11 +449,94 @@ class TwitterMonitorClient(BaseClient):
         
         try:
             data = await self._make_request(method="GET", endpoint=endpoint, params=params)
-            
             if not data:
-                logger.error("Failed to retrieve list members data")
-                return
+                logger.error("Failed to retrieve list members: Empty response")
+                return []
+
+            members = []
+            instructions = data.get('data', {}).get('list', {}).get('members_timeline', {}).get('timeline', {}).get('instructions', [])
             
+            for instruction in instructions:
+                if instruction.get('type') == 'TimelineAddEntries':
+                    entries = instruction.get('entries', [])
+                    for entry in entries:
+                        try:
+                            if entry.get('content', {}).get('entryType') == 'TimelineTimelineItem':
+                                user_results = entry.get('content', {}).get('itemContent', {}).get('user_results', {}).get('result', {})
+                                if user_results:
+                                    legacy = user_results.get('legacy', {})
+                                    member = {
+                                        'id': user_results.get('rest_id'),
+                                        'screen_name': legacy.get('screen_name'),
+                                        'name': legacy.get('name'),
+                                        'description': legacy.get('description'),
+                                        'followers_count': legacy.get('followers_count'),
+                                        'following_count': legacy.get('friends_count'),
+                                        'verified': legacy.get('verified', False),
+                                        'profile_image_url': legacy.get('profile_image_url_https'),
+                                        'created_at': legacy.get('created_at')
+                                    }
+                                    members.append(member)
+                        except Exception as e:
+                            logger.error(f"Error processing list member entry: {str(e)}")
+                            continue
+
+            logger.info(f"Retrieved {len(members)} list members")
+            return members
+
+        except Exception as e:
+            logger.error(f"Error retrieving list members: {str(e)}")
+            logger.exception("Exception details:")
+            return []
+
+    async def initialize_list_members(self):
+        """Initialize the monitored accounts from the Twitter list."""
+        if not self.list_route or not self.list_id:
+            raise ValueError("list_route or list_id not initialized")
+            
+        endpoint = f"/graphql/{self.list_route}/ListMembers"
+        variables = {
+            "listId": self.list_id,
+            "count": 100,  # Increased to get more members
+            "withSafetyModeUserFields": True
+        }
+        features = {
+            "rweb_tipjar_consumption_enabled": True,
+            "responsive_web_graphql_exclude_directive_enabled": True,
+            "verified_phone_label_enabled": False,
+            "creator_subscriptions_tweet_preview_api_enabled": True,
+            "responsive_web_graphql_timeline_navigation_enabled": True,
+            "responsive_web_graphql_skip_user_profile_image_extensions_enabled": False,
+            "communities_web_enable_tweet_community_results_fetch": True,
+            "c9s_tweet_anatomy_moderator_badge_enabled": True,
+            "tweetypie_unmention_optimization_enabled": True,
+            "responsive_web_edit_tweet_api_enabled": True,
+            "graphql_is_translatable_rweb_tweet_is_translatable_enabled": True,
+            "view_counts_everywhere_api_enabled": True,
+            "longform_notetweets_consumption_enabled": True,
+            "responsive_web_twitter_article_tweet_consumption_enabled": True,
+            "tweet_awards_web_tipping_enabled": False,
+            "freedom_of_speech_not_reach_fetch_enabled": True,
+            "standardized_nudges_misinfo": True,
+            "tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled": True,
+            "rweb_video_timestamps_enabled": True,
+            "longform_notetweets_rich_text_read_enabled": True,
+            "longform_notetweets_inline_media_enabled": True,
+            "responsive_web_enhance_cards_enabled": False,
+            "articles_preview_enabled": True,
+            "creator_subscriptions_quote_tweet_preview_enabled": False
+        }
+        params = {
+            "variables": json.dumps(variables),
+            "features": json.dumps(features)
+        }
+        
+        try:
+            data = await self._make_request(method="GET", endpoint=endpoint, params=params)
+            if not data:
+                logger.error("Failed to retrieve list members: Empty response")
+                return
+
             # Clear existing monitored accounts before updating
             self.monitored_accounts.clear()
             
@@ -461,18 +545,22 @@ class TwitterMonitorClient(BaseClient):
                 if instruction.get('type') == 'TimelineAddEntries':
                     entries = instruction.get('entries', [])
                     for entry in entries:
-                        if entry.get('content', {}).get('entryType') == 'TimelineTimelineItem':
-                            user_results = entry.get('content', {}).get('itemContent', {}).get('user_results', {}).get('result', {})
-                            if user_results:
-                                screen_name = user_results.get('legacy', {}).get('screen_name')
-                                user_id = user_results.get('rest_id')
-                                if screen_name and user_id:
-                                    self.monitored_accounts[screen_name] = user_id
-                                    logger.debug(f"Added {screen_name}: {user_id} to monitored accounts")
-            
+                        try:
+                            if entry.get('content', {}).get('entryType') == 'TimelineTimelineItem':
+                                user_results = entry.get('content', {}).get('itemContent', {}).get('user_results', {}).get('result', {})
+                                if user_results:
+                                    legacy = user_results.get('legacy', {})
+                                    screen_name = legacy.get('screen_name')
+                                    user_id = user_results.get('rest_id')
+                                    if screen_name and user_id:
+                                        self.monitored_accounts[screen_name] = user_id
+                                        logger.debug(f"Added {screen_name}: {user_id} to monitored accounts")
+                        except Exception as e:
+                            logger.error(f"Error processing list member entry: {str(e)}")
+                            continue
+
             logger.info(f"Initialized and updated {len(self.monitored_accounts)} monitored accounts from the list.")
         except Exception as e:
             logger.error(f"Error initializing list members: {str(e)}")
             import traceback
             logger.error(traceback.format_exc())
-
