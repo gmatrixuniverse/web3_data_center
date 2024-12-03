@@ -154,6 +154,7 @@ class BaseClient:
         full_headers['Content-Type'] = 'application/json'
         full_headers['Accept'] = 'application/json'
         params = self._set_auth_params(params)
+        # print(f"Making {method} request to {url} with headers {full_headers} and params {params}, data {data}")
         if self.use_zenrows:
             url, params = self._prepare_zenrows_request(url, params)
 
