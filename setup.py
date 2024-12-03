@@ -5,14 +5,25 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name='web3_data_center',
-    version='0.5.4',
+    version='0.5.5',
     description='Web3 data center integrating multiple APIs for blockchain data analysis',
     long_description=long_description,
     long_description_content_type='text/markdown',
     author='Gmatrixuniverse',
     author_email='gmatrixuniverse@gmail.com',
     url='https://github.com/gmatrixuniverse/web3_data_center',
-    packages=find_packages(exclude=['tests*']),
+    packages=[
+        'web3_data_center',
+        'web3_data_center.core',
+        'web3_data_center.clients',
+        'web3_data_center.clients.database',
+        'web3_data_center.models',
+        'web3_data_center.utils'
+    ],
+    package_data={
+        'web3_data_center': ['**/*.txt', '**/*.json']
+    },
+    include_package_data=True,
     install_requires=[
         'asyncio',
         'aiohttp',
