@@ -912,7 +912,7 @@ class DataCenter:
                 funding_results = await self.funding_client.batch_simulate_view_first_fund(batch_addresses)
                 
                 if not funding_results:
-                    logger.error(f"No funding results returned for addresses: {batch_addresses}")
+                    logger.error(f"No funding transactions found for addresses: {batch_addresses}")
                     tree.update({addr: None for addr in batch_addresses})
                     continue
 
@@ -948,8 +948,8 @@ class DataCenter:
                                     tree[addr] = None
                                     continue
                                 next_funder = tx['from']
-                            except Exception as tx_error:
-                                logger.error(f"Error getting transaction {tx_hash}: {str(tx_error)}")
+                            except Exception as e:
+                                logger.error(f"Error getting transaction {tx_hash}: {str(e)}")
                                 tree[addr] = None
                                 continue
 
@@ -1144,6 +1144,7 @@ class DataCenter:
                 - label: The address label (or "Default" if none)
                 - name_tag: The name tag of the address (if any)
                 - type: The type of the address (if any)
+                - entity: The entity type of the address (if any)
         """
         path = []
         current_address = address
@@ -1207,7 +1208,7 @@ class DataCenter:
                                 label_type = (label_info.get('type') or 'DEFAULT').upper()
                                 name_tag = (label_info.get('name_tag') or '').upper()
                                 is_cex = any(cex_term in label_type for cex_term in ['CEX', 'EXCHANGE'])
-                                
+                                entity = label_info.get('entity')
                                 # Add to path
                                 path.append({
                                     'address': funder,
@@ -1216,7 +1217,8 @@ class DataCenter:
                                     'is_cex': is_cex,
                                     'label': label_info.get('label', 'Default'),
                                     'name_tag': name_tag,
-                                    'type': label_type
+                                    'type': label_type,
+                                    'entity': entity
                                 })
                                 
                                 # If this is a CEX and we should stop, prune the path and return
@@ -1235,7 +1237,8 @@ class DataCenter:
                                     'is_cex': False,
                                     'label': 'Default',
                                     'name_tag': '',
-                                    'type': ''
+                                    'type': '',
+                                    'entity': ''
                                 })
                     
                     # Clear pending lists
@@ -1264,6 +1267,8 @@ class DataCenter:
                             name_tag = (label_info.get('name_tag') or '').upper()
                             is_cex = any(cex_term in label_type for cex_term in ['CEX', 'EXCHANGE'])
                             
+                            entity = label_info.get('entity')
+                            
                             path.append({
                                 'address': funder,
                                 'tx_hash': tx_hash,
@@ -1271,7 +1276,8 @@ class DataCenter:
                                 'is_cex': is_cex,
                                 'label': label_info.get('label', 'Default'),
                                 'name_tag': name_tag,
-                                'type': label_type
+                                'type': label_type,
+                                'entity': entity
                             })
                             
                             if stop_at_cex and is_cex:
@@ -1288,7 +1294,8 @@ class DataCenter:
                                 'is_cex': False,
                                 'label': 'Default',
                                 'name_tag': '',
-                                'type': ''
+                                'type': '',
+                                'entity': ''
                             })
             
             return path
@@ -1306,7 +1313,9 @@ class DataCenter:
     ) -> Optional[Dict[str, Any]]:
         """
         Check if two addresses have a funding relationship by finding common funders
-        in their funding paths.
+        in their funding paths. A common funder can be:
+        1. Same address in both paths
+        2. Different addresses but belong to the same non-empty entity
         
         Args:
             address1: First address to check
@@ -1316,15 +1325,17 @@ class DataCenter:
             
         Returns:
             Optional[Dict[str, Any]]: If a relationship is found, returns:
-                - common_funder: The common funder's address
-                - depth1: Depth of common funder in first address's path
-                - depth2: Depth of common funder in second address's path
-                - tx_hash1: Transaction hash from common funder to first path
-                - tx_hash2: Transaction hash from common funder to second path
-                - is_cex: Boolean indicating if the common funder is a CEX/EXCHANGE
-                - label: The funder's label (or "Default" if none)
-                - name_tag: The name tag of the address (if any)
-                - type: The type of the address (if any)
+                - common_funder1: The funder's address in first path
+                - common_funder2: The funder's address in second path (same as common_funder1 if same address)
+                - depth1: Depth of funder in first address's path
+                - depth2: Depth of funder in second address's path
+                - tx_hash1: Transaction hash from funder to first path
+                - tx_hash2: Transaction hash from funder to second path
+                - common_type: Type of relationship (1: same entity, 2: same address with empty entity, 0: no relationship)
+                - label: The funder's label
+                - name_tag: The name tag of the funder
+                - type: The type of the funder
+                - entity: The entity of the funder (if any)
             Returns None if no relationship is found
         """
         try:
@@ -1336,30 +1347,75 @@ class DataCenter:
             path1_map = {step['address']: step for step in path1}
             path2_map = {step['address']: step for step in path2}
             
-            # Find common funders
-            common_funders = set(path1_map.keys()) & set(path2_map.keys())
-            if not common_funders:
+            # Find relationships
+            relationships = []
+            
+            # Case 1: Same address funders
+            common_addresses = set(path1_map.keys()) & set(path2_map.keys())
+            for addr in common_addresses:
+                funder1 = path1_map[addr]
+                funder2 = path2_map[addr]
+                common_type = 1 if funder1.get('entity') and funder1['entity'] == funder2.get('entity') else 2
+                relationships.append({
+                    'common_funder1': addr,
+                    'common_funder2': addr,
+                    'funder1': funder1,
+                    'funder2': funder2,
+                    'combined_depth': funder1['depth'] + funder2['depth'],
+                    'common_type': common_type
+                })
+            
+            # Case 2: Different addresses with same non-empty entity
+            entity_map1 = {}
+            entity_map2 = {}
+            
+            for addr, data in path1_map.items():
+                entity = data.get('entity')
+                if entity:
+                    if entity not in entity_map1:
+                        entity_map1[entity] = []
+                    entity_map1[entity].append((addr, data))
+                    
+            for addr, data in path2_map.items():
+                entity = data.get('entity')
+                if entity:
+                    if entity not in entity_map2:
+                        entity_map2[entity] = []
+                    entity_map2[entity].append((addr, data))
+            
+            # Find addresses with same entity
+            common_entities = set(entity_map1.keys()) & set(entity_map2.keys())
+            for entity in common_entities:
+                for addr1, funder1 in entity_map1[entity]:
+                    for addr2, funder2 in entity_map2[entity]:
+                        if addr1 != addr2:  # Skip if same address (already handled in Case 1)
+                            relationships.append({
+                                'common_funder1': addr1,
+                                'common_funder2': addr2,
+                                'funder1': funder1,
+                                'funder2': funder2,
+                                'combined_depth': funder1['depth'] + funder2['depth'],
+                                'common_type': 1  # Same entity
+                            })
+            
+            if not relationships:
                 return None
                 
-            # Find the closest common funder (minimum combined depth)
-            closest_funder = min(
-                common_funders,
-                key=lambda x: path1_map[x]['depth'] + path2_map[x]['depth']
-            )
-            
-            funder1 = path1_map[closest_funder]
-            funder2 = path2_map[closest_funder]
+            # Find the closest relationship (minimum combined depth)
+            closest = min(relationships, key=lambda x: x['combined_depth'])
             
             return {
-                'common_funder': closest_funder,
-                'depth1': funder1['depth'],
-                'depth2': funder2['depth'],
-                'tx_hash1': funder1['tx_hash'],
-                'tx_hash2': funder2['tx_hash'],
-                'is_cex': funder1['is_cex'],  # Both should have same is_cex value
-                'label': funder1['label'],  # Both should have same label
-                'name_tag': funder1.get('name_tag', ''),  # Both should have same name_tag
-                'type': funder1.get('type', 'EOA')  # Both should have same type
+                'common_funder1': closest['common_funder1'],
+                'common_funder2': closest['common_funder2'],
+                'depth1': closest['funder1']['depth'],
+                'depth2': closest['funder2']['depth'],
+                'tx_hash1': closest['funder1']['tx_hash'],
+                'tx_hash2': closest['funder2']['tx_hash'],
+                'common_type': closest['common_type'],
+                'label': closest['funder1']['label'],
+                'name_tag': closest['funder1'].get('name_tag', ''),
+                'type': closest['funder1'].get('type', 'EOA'),
+                'entity': closest['funder1'].get('entity', '')
             }
             
         except Exception as e:

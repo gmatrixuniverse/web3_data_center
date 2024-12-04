@@ -83,6 +83,7 @@ class Web3LabelClient:
             query = """
             SELECT 
                 mca.address,
+                me.entity,
                 me.category AS type,
                 mca.name_tag,
                 mca.entity
