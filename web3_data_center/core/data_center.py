@@ -21,8 +21,8 @@ logger = logging.getLogger(__name__)
 class DataCenter:
     def __init__(self, config_path: str = "config.yml"):
         # Configure logging
-        logging.getLogger('web3_data_center.clients.database.postgresql_client').setLevel(logging.INFO)
-        logging.getLogger('web3_data_center.clients.database.web3_label_client').setLevel(logging.INFO)
+        logging.getLogger('web3_data_center.clients.database.postgresql_client').setLevel(logging.WARNING)
+        logging.getLogger('web3_data_center.clients.database.web3_label_client').setLevel(logging.WARNING)
         
         # Load configuration
         

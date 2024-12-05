@@ -7,7 +7,7 @@ import logging
 from .base_database_client import BaseDatabaseClient
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)  # Set default level to INFO
+logger.setLevel(logging.WARNING)  # Set default level to INFO
 
 # Register list adapter for PostgreSQL arrays
 def adapt_list(lst):

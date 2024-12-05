@@ -5,7 +5,7 @@ import time
 from .base_database_client import BaseDatabaseClient
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)  # Set default level to INFO
+logger.setLevel(logging.WARNING)  # Set default level to INFO
 
 class Web3LabelClient:
     def __init__(self, db_client: BaseDatabaseClient = None, config_path: str = None, cache_ttl: int = 3600):
