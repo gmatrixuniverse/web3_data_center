@@ -44,7 +44,7 @@ class DataCenter:
         # Initialize Web3LabelClient from config
         try:
             self.label_client = Web3LabelClient(config_path=config_path)
-            logger.info("Successfully initialized Web3LabelClient")
+            # logger.info("Successfully initialized Web3LabelClient")
         except Exception as e:
             logger.error(f"Failed to initialize Web3LabelClient: {str(e)}")
             self.label_client = None

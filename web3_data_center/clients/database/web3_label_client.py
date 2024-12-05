@@ -68,17 +68,17 @@ class Web3LabelClient:
         try:
             # Input validation
             if not addresses:
-                logger.info("Empty address list provided")
+                # logger.info("Empty address list provided")
                 return []
             
             # Clean and validate addresses
             cleaned_addresses = [addr.lower().strip() for addr in addresses if addr]
             if not cleaned_addresses:
-                logger.info("No valid addresses after cleaning")
+                # logger.info("No valid addresses after cleaning")
                 return []
             
             # Log the query parameters
-            logger.info(f"Querying labels for {len(cleaned_addresses)} addresses")
+            # logger.info(f"Querying labels for {len(cleaned_addresses)} addresses")
             
             # Construct query using ANY for better performance with arrays
             query = """
@@ -96,7 +96,7 @@ class Web3LabelClient:
             # Execute query with address list as a single parameter
             try:
                 results = self.db_client.execute_query(query, {"chain_id": 0 if chain_id == 1 else chain_id, "addresses": cleaned_addresses})
-                logger.info(f"Found {len(results)} labels for {len(cleaned_addresses)} addresses")
+                # logger.info(f"Found {len(results)} labels for {len(cleaned_addresses)} addresses")
                 return results
             except Exception as e:
                 logger.error(f"Error querying labels: {str(e)}")
