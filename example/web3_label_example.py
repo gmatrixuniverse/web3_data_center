@@ -14,7 +14,7 @@ from web3_data_center.clients.database.web3_label_client import Web3LabelClient
 
 # Set up logging
 logging.basicConfig(
-    level=logging.DEBUG,
+    # level=logging.DEBUG,
     format='%(asctime)s - %(levelname)s - %(message)s',
     force=True
 )

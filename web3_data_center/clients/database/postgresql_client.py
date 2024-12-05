@@ -7,6 +7,7 @@ import logging
 from .base_database_client import BaseDatabaseClient
 
 logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)  # Set default level to INFO
 
 # Register list adapter for PostgreSQL arrays
 def adapt_list(lst):
@@ -58,7 +59,7 @@ class PostgreSQLClient(BaseDatabaseClient):
                     cursor_factory=psycopg2.extras.RealDictCursor
                 )
                 self._connection.autocommit = True
-                logger.debug("Connected to PostgreSQL database")
+                # logger.info("Connected to PostgreSQL database")
         except Exception as e:
             logger.error(f"Failed to connect to PostgreSQL: {str(e)}")
             raise
@@ -70,7 +71,7 @@ class PostgreSQLClient(BaseDatabaseClient):
                 self._cursor.close()
             if hasattr(self, '_connection') and self._connection and not self._connection.closed:
                 self._connection.close()
-                logger.debug("Disconnected from PostgreSQL database")
+                # logger.info("Disconnected from PostgreSQL database")
         except Exception as e:
             logger.error(f"Error disconnecting from PostgreSQL: {str(e)}")
         finally:
@@ -92,16 +93,15 @@ class PostgreSQLClient(BaseDatabaseClient):
                 parameters = list(parameters)
             
             # Detailed parameter validation and logging
-            logger.debug(f"Original query: {query}")
-            logger.debug(f"Parameters before processing: {parameters}")
-            logger.debug(f"Parameter type before processing: {type(parameters)}")
+            # logger.info(f"Executing query: {query}")
+            # logger.info(f"Parameters: {parameters}")
             
             # Count placeholders in query
             placeholder_count = query.count('%s')
             if isinstance(parameters, (list, tuple)):
                 param_count = len(parameters)
-                logger.debug(f"Number of placeholders in query: {placeholder_count}")
-                logger.debug(f"Number of parameters provided: {param_count}")
+                # logger.info(f"Number of placeholders in query: {placeholder_count}")
+                # logger.info(f"Number of parameters provided: {param_count}")
                 
                 if placeholder_count != param_count:
                     error_msg = f"Mismatch between number of placeholders ({placeholder_count}) and parameters ({param_count})"
@@ -114,7 +114,7 @@ class PostgreSQLClient(BaseDatabaseClient):
                 results = self.cursor.fetchall()
                 
                 # Log success
-                logger.debug(f"Query executed successfully. Returned {len(results)} rows.")
+                # logger.info(f"Query executed successfully. Returned {len(results)} rows.")
                 return [dict(row) for row in results]
             except Exception as e:
                 logger.error(f"Error during query execution: {str(e)}")
@@ -129,7 +129,6 @@ class PostgreSQLClient(BaseDatabaseClient):
             logger.error(f"Error executing query: {str(e)}")
             logger.error(f"Query: {query}")
             logger.error(f"Parameters: {parameters}")
-            logger.error(f"Parameter type: {type(parameters)}")
             
             raise
             

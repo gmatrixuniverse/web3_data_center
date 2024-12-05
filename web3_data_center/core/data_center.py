@@ -14,10 +14,16 @@ from evm_decoder.utils.constants import UNI_V2_SWAP_TOPIC, UNI_V3_SWAP_TOPIC
 from evm_decoder import DecoderManager, AnalyzerManager, ContractManager
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
 from web3 import Web3
-logger = get_logger(__name__)
+import logging
+
+logger = logging.getLogger(__name__)
 
 class DataCenter:
     def __init__(self, config_path: str = "config.yml"):
+        # Configure logging
+        logging.getLogger('web3_data_center.clients.database.postgresql_client').setLevel(logging.INFO)
+        logging.getLogger('web3_data_center.clients.database.web3_label_client').setLevel(logging.INFO)
+        
         # Load configuration
         
         self.geckoterminal_client = GeckoTerminalClient(config_path=config_path)
@@ -857,14 +863,25 @@ class DataCenter:
                         funder_map[addr] = None
                         continue
 
-                    # Get transaction details using web3
-                    tx = self.w3_client.eth.get_transaction(tx_hash)
-                    if not tx:
-                        logger.error(f"Could not find transaction {tx_hash}")
-                        funder_map[addr] = None
-                        continue
+                    # Try to get funder from API response first
+                    next_funder = result_data.get('From')
+                    
+                    if not next_funder:
+                        # Fallback to transaction lookup
+                        try:
+                            loop = asyncio.get_event_loop()
+                            tx = await loop.run_in_executor(None, self.w3_client.eth.get_transaction, tx_hash)
+                            if not tx:
+                                logger.error(f"No transaction found for hash {tx_hash}")
+                                funder_map[addr] = None
+                                continue
+                            next_funder = tx['from']
+                        except Exception as e:
+                            logger.error(f"Error getting transaction {tx_hash}: {str(e)}")
+                            funder_map[addr] = None
+                            continue
 
-                    funder_map[addr] = tx['from']
+                    funder_map[addr] = next_funder
 
                 except Exception as e:
                     logger.error(f"Error processing address {addr}: {str(e)}")
