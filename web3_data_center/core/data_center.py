@@ -24,6 +24,7 @@ class DataCenter:
         # Configure logging
         logging.getLogger('web3_data_center.clients.database.postgresql_client').setLevel(logging.WARNING)
         logging.getLogger('web3_data_center.clients.database.web3_label_client').setLevel(logging.WARNING)
+        logging.getLogger('web3_data_center.clients.opensearch_client').setLevel(logging.WARNING)
         
         # Load configuration
         
