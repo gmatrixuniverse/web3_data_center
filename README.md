@@ -6,6 +6,7 @@ Web3 Data Center is a Python package that integrates multiple APIs to provide co
 
 - Integration with multiple blockchain data providers (GeckoTerminal, GMGN, Birdeye, Solscan, GoPlus, DexScreener)
 - Asynchronous API calls for improved performance
+- Persistent file-based caching system for optimized data retrieval
 - Caching mechanism to reduce API calls and improve response times
 - Support for multiple blockchains (Ethereum, Solana, and more)
 - Token information retrieval (price, market cap, holders, etc.)
@@ -41,6 +42,48 @@ print(f"Top 10 Holders: {top_holders}")
 asyncio.run(main())
 ```
 
+
+## Caching System
+
+Web3 Data Center includes a robust file-based caching system to improve performance and reduce API calls. The cache is stored in `~/.web3_data_center/cache/` and is automatically managed.
+
+### Cached Operations
+
+The following operations are cached by default:
+- Root funder lookups (24-hour cache)
+- Funding path queries (24-hour cache)
+- Funding relationship checks (24-hour cache)
+
+### Using the Cache
+
+The cache is automatically used when calling the relevant methods. You can also use the caching decorator for your own functions:
+
+```python
+from web3_data_center import file_cache
+
+@file_cache(namespace="my_cache", ttl=3600)  # 1-hour cache
+async def my_function():
+    # Your code here
+    pass
+```
+
+### Cache Management
+
+To clear the cache for a specific function:
+```python
+data_center.get_root_funder.cache_clear()
+```
+
+To get the cache directory:
+```python
+from web3_data_center import get_cache_dir
+cache_dir = get_cache_dir()
+```
+
+The cache automatically manages:
+- Entry expiration (TTL-based)
+- Size limits
+- Cleanup of old entries
 
 ## Documentation
 

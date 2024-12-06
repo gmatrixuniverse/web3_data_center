@@ -10,3 +10,5 @@ lxml
 pytesseract
 opensearch-py
 pymongo
+aiofiles>=23.1.0  # For async file operations
+diskcache>=5.6.1  # For disk-based caching

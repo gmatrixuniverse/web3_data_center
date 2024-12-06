@@ -6,6 +6,7 @@ from ..models.token import Token
 from ..models.holder import Holder
 from ..models.price_history_point import PriceHistoryPoint
 from ..utils.logger import get_logger
+from ..utils.cache import file_cache
 import time
 import datetime
 from chain_index import get_chain_info, get_all_chain_tokens
@@ -1027,6 +1028,7 @@ class DataCenter:
             logger.error(f"Error in get_funder_tree: {str(e)}")
             return {addr: None for addr in addresses}
 
+    @file_cache(namespace="root_funder", ttl=3600*24)  # Cache for 24 hours
     async def get_root_funder(self, address: str, max_depth: int = 100) -> Optional[Dict[str, Any]]:
         """
         Get the root funder (the earliest funder with no further funding source) for a given address.
@@ -1143,6 +1145,7 @@ class DataCenter:
         results = await asyncio.gather(*tasks)
         return dict(zip(addresses, results))
 
+    @file_cache(namespace="funding_path", ttl=3600*24)  # Cache for 24 hours
     async def get_funding_path(self, address: str, max_depth: int = 20, stop_at_cex: bool = True) -> List[Dict[str, Any]]:
         """
         Get the complete funding path for an address up to the root funder or first CEX.
@@ -1321,6 +1324,7 @@ class DataCenter:
             logger.error(f"Error getting funding path: {str(e)}")
             return path
 
+    @file_cache(namespace="funding_relationship", ttl=3600*24)  # Cache for 24 hours
     async def check_funding_relationship(
         self, 
         address1: str, 
@@ -1496,3 +1500,39 @@ class DataCenter:
         except Exception as e:
             logger.error(f"Error getting latest swap orders: {str(e)}")
             return []
+
+    async def get_contract_creator_tx(self, contract_address: str) -> Optional[str]:
+        """
+        Get the transaction hash that created a contract.
+        
+        Args:
+            contract_address: The contract address to look up
+            
+        Returns:
+            Optional[str]: The transaction hash that created the contract, or None if not found
+        """
+        return await self.opensearch_client.get_contract_creator_tx(contract_address)
+
+    async def get_contract_creator(self, contract_address: str) -> Optional[str]:
+        """
+        Get the address that created a contract.
+        
+        Args:
+            contract_address: The contract address to look up
+            
+        Returns:
+            Optional[str]: The address that created the contract, or None if not found
+        """
+        creator_tx = await self.get_contract_creator_tx(contract_address)
+        if creator_tx:
+            return self.w3_client.eth.get_transaction(creator_tx)['from']
+        else:
+            return None
+
+    async def __aenter__(self):
+        """Async context manager entry"""
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit with proper cleanup"""
+        await self.close()

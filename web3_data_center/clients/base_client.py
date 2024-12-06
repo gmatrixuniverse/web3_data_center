@@ -56,6 +56,25 @@ class BaseClient:
         rpm = self.config['api'][api_name].get('rpm', 120)  # Default to 120 RPM if not specified
         self.rate_limiter = RateLimiter(rpm)
         self.semaphore = asyncio.Semaphore(self.config['api'][api_name].get('max_concurrent', 5))
+        self.session = None
+
+    async def __aenter__(self):
+        """Async context manager entry"""
+        if not self.session:
+            self.session = aiohttp.ClientSession()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit"""
+        if self.session:
+            await self.session.close()
+            self.session = None
+
+    async def close(self):
+        """Close the client and cleanup resources"""
+        if self.session:
+            await self.session.close()
+            self.session = None
 
     def load_config(self, config_path: str) -> Dict[str, Any]:
         try:
@@ -149,43 +168,44 @@ class BaseClient:
         headers: Optional[Dict[str, str]] = None,
         timeout: int = 30
     ) -> Dict[str, Any]:
+        if not self.session:
+            self.session = aiohttp.ClientSession(timeout=ClientTimeout(total=timeout))
+
         url = f"{self.base_url}{endpoint}"
         full_headers = {**self.headers, **(headers or {})}
         full_headers['Content-Type'] = 'application/json'
         full_headers['Accept'] = 'application/json'
-        params = self._set_auth_params(params)
-        # print(f"Making {method} request to {url} with headers {full_headers} and params {params}, data {data}")
+        params = self._set_auth_params(params or {})
+
         if self.use_zenrows:
             url, params = self._prepare_zenrows_request(url, params)
 
-        async with aiohttp.ClientSession(timeout=ClientTimeout(total=timeout)) as session:
-            try:
-                # print(f"Making {method} request to {url} with headers {full_headers} and params {params}, data {data}")
-                async with session.request(
-                    method=method.upper(),
-                    url=url,
-                    params=params,
-                    json=data,
-                    headers=full_headers,
-                    proxy=self.proxy
-                ) as response:
-                    response.raise_for_status()
-                    return await self._handle_json_response(response)
-            except aiohttp.ClientResponseError as e:
-                logging.error(f"HTTP error {e.status}: {e.message}")
-                raise
-            except aiohttp.ClientError as e:
-                logging.error(f"Client error: {str(e)}")
-                raise
-            except asyncio.TimeoutError:
-                logging.error("Request timed out")
-                raise
-            except json.JSONDecodeError as e:
-                logging.error(f"Failed to decode JSON response: {str(e)}")
-                raise
-            except Exception as e:
-                logging.error(f"Unexpected error: {str(e)}")
-                raise
+        try:
+            async with self.session.request(
+                method=method.upper(),
+                url=url,
+                params=params,
+                json=data,
+                headers=full_headers,
+                proxy=self.proxy
+            ) as response:
+                response.raise_for_status()
+                return await self._handle_json_response(response)
+        except aiohttp.ClientResponseError as e:
+            logging.error(f"HTTP error {e.status}: {e.message}")
+            raise
+        except aiohttp.ClientError as e:
+            logging.error(f"Client error: {str(e)}")
+            raise
+        except asyncio.TimeoutError:
+            logging.error("Request timed out")
+            raise
+        except json.JSONDecodeError as e:
+            logging.error(f"Failed to decode JSON response: {str(e)}")
+            raise
+        except Exception as e:
+            logging.error(f"Unexpected error: {str(e)}")
+            raise
 
     def _prepare_zenrows_request(self, url: str, params: Optional[Dict[str, Any]]) -> tuple:
         from urllib.parse import urlencode

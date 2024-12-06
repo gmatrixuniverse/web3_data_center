@@ -25,9 +25,25 @@ class OpenSearchClient(BaseClient):
             verify_certs=True,
             timeout=self.config['api']['opensearch'].get('timeout', 120)
         )
-        # logger.info(f"OpenSearch host: {self.config['api']['opensearch']['hosts']}")
-        # logger.info(f"OpenSearch username: {self.credentials['username']}")
-        # logger.info(f"OpenSearch password: {self.credentials['password']}")
+
+    async def __aenter__(self):
+        """Async context manager entry"""
+        await super().__aenter__()
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit"""
+        try:
+            await self.close()
+        finally:
+            await super().__aexit__(exc_type, exc_val, exc_tb)
+
+    async def close(self):
+        """Close the client and cleanup resources"""
+        if hasattr(self, 'client') and self.client is not None:
+            await self.client.close()
+            self.client = None
+        await super().close()
 
     async def test_connection(self) -> bool:
         try:
@@ -105,8 +121,6 @@ class OpenSearchClient(BaseClient):
             "sort": [{"Number": {"order": "asc"}}]
         }
 
-    async def close(self):
-        await self.client.close()
     @staticmethod
     def _build_specific_txs_query(to_address: str, start_block: int, end_block: int, size: int) -> Dict[str, Any]:
                 return {
@@ -405,3 +419,66 @@ class OpenSearchClient(BaseClient):
         finally:
             if 'scroll_id' in locals():
                 await self.client.clear_scroll(scroll_id=scroll_id)
+
+    @retry(
+        stop=stop_after_attempt(3),
+        wait=wait_exponential(multiplier=1, min=4, max=10),
+        retry=retry_if_exception_type((ConnectionTimeout, OpenSearchException))
+    )
+    async def get_contract_creator_tx(self, contract_address: str) -> Optional[str]:
+        """
+        Get the transaction hash that created a contract.
+        
+        Args:
+            contract_address: The contract address to look up
+            
+        Returns:
+            Optional[str]: The transaction hash that created the contract, or None if not found
+        """
+        try:
+            query = {
+                "query": {
+                    "nested": {
+                        "path": "Transactions.Contracts",
+                        "query": {
+                            "term": {
+                                "Transactions.Contracts.Address": {
+                                    "value": contract_address.lower()
+                                }
+                            }
+                        },
+                        "inner_hits": {
+                            "_source": {
+                                "includes": ["Transactions.Contracts.*", "Transactions.Hash"]
+                            },
+                            "size": 10
+                        }
+                    }
+                }
+            }
+            
+            response = await self.client.search(
+                index="eth_code_all",
+                body=query
+            )
+            
+            if response["hits"]["total"]["value"] > 0:
+                # Get the transaction that contains the contract creation
+                transaction = response["hits"]["hits"][0]["_source"]["Transactions"]
+                
+                # Find the specific transaction that created our contract
+                for tx in transaction:
+                    if "Contracts" in tx:
+                        for contract in tx["Contracts"]:
+                            if contract["Address"].lower() == contract_address.lower():
+                                return tx["Hash"]
+            
+            return None
+            
+        except NotFoundError:
+            logger.error(f"Index eth_code_all not found")
+            return None
+        except Exception as e:
+            logger.error(f"Error getting contract creator tx: {str(e)}")
+            logger.error(traceback.format_exc())
+            return None
