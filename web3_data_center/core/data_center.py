@@ -26,6 +26,11 @@ class DataCenter:
         logging.getLogger('web3_data_center.clients.database.web3_label_client').setLevel(logging.WARNING)
         logging.getLogger('web3_data_center.clients.opensearch_client').setLevel(logging.WARNING)
         
+        # Configure opensearch library logging
+        logging.getLogger('opensearch').setLevel(logging.WARNING)
+        logging.getLogger('opensearch.transport').setLevel(logging.WARNING)
+        logging.getLogger('opensearch.connection.http_urllib3').setLevel(logging.WARNING)
+        
         # Load configuration
         
         self.geckoterminal_client = GeckoTerminalClient(config_path=config_path)
@@ -368,9 +373,60 @@ class DataCenter:
         return None
 
     async def close(self):
-        # await self.opensearch_client.close()
-        pass
-        # Close other clients if they have close methods
+        """Close all clients and cleanup resources"""
+        clients = [
+            self.geckoterminal_client,
+            self.gmgn_client,
+            self.birdeye_client,
+            self.solscan_client,
+            self.goplus_client,
+            self.dexscreener_client,
+            self.chainbase_client,
+            self.etherscan_client,
+            self.opensearch_client,
+            self.funding_client,
+            self.label_client
+        ]
+        
+        for client in clients:
+            if client is not None and hasattr(client, 'close'):
+                try:
+                    if asyncio.iscoroutinefunction(client.close):
+                        await client.close()
+                    else:
+                        client.close()
+                except Exception as e:
+                    logger.warning(f"Error closing client {client.__class__.__name__}: {str(e)}")
+
+    async def __aenter__(self):
+        """Async context manager entry"""
+        # Initialize clients that support async context managers
+        clients = [
+            self.geckoterminal_client,
+            self.gmgn_client,
+            self.birdeye_client,
+            self.solscan_client,
+            self.goplus_client,
+            self.dexscreener_client,
+            self.chainbase_client,
+            self.etherscan_client,
+            self.opensearch_client,
+            self.funding_client,
+            self.label_client
+        ]
+        
+        for client in clients:
+            if client is not None and hasattr(client, '__aenter__'):
+                try:
+                    await client.__aenter__()
+                except Exception as e:
+                    logger.warning(f"Error initializing client {client.__class__.__name__}: {str(e)}")
+        
+        return self
+
+    async def __aexit__(self, exc_type, exc_val, exc_tb):
+        """Async context manager exit with proper cleanup"""
+        await self.close()
 
     async def get_specific_txs(self, to_address: str, start_block: int, end_block: int, size: int = 1000) -> List[Dict[str, Any]]:
         cache_key = f"specific_txs:{to_address}:{start_block}:{end_block}:{size}"
@@ -1529,11 +1585,3 @@ class DataCenter:
             return self.w3_client.eth.get_transaction(creator_tx)['from']
         else:
             return None
-
-    async def __aenter__(self):
-        """Async context manager entry"""
-        return self
-
-    async def __aexit__(self, exc_type, exc_val, exc_tb):
-        """Async context manager exit with proper cleanup"""
-        await self.close()
