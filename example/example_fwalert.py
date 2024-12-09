@@ -14,8 +14,7 @@ from web3 import Web3
 
 async def trigger_alert():
     # Get the singleton instance
-    fwclient = FWAlertClient.get_instance()
-    await fwclient.callme("Vitalik发新推文了")
+    await FWAlertClient.callme("Hello Word")
 
 
 async def main():

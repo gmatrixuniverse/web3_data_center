@@ -20,15 +20,18 @@ class FWAlertClient(BaseClient):
             super().__init__('fwalert', config_path=config_path, use_proxy=use_proxy)
             self._initialized = True
 
-    async def callme(self, topic) -> Dict[str, Any]:
-        # include topic in params and set as actual params
-        actual_params = {"topic": topic}
-        endpoint = self.config['api']['fwalert']['default_endpoint']
-        return await self._make_request(endpoint, method="GET", params=actual_params)
+    @classmethod
+    async def callme(cls, topic, config_path: str = "config.yml", use_proxy: bool = False) -> Dict[str, Any]:
+        async with cls(config_path, use_proxy) as client:
+            actual_params = {"topic": topic}
+            endpoint = client.config['api']['fwalert']['default_endpoint']
+            return await client._make_request(endpoint, method="GET", params=actual_params)
 
-    async def notify(self, slug, params) -> Dict[str, Any]:
-        endpoint = "/"+ slug
-        return await self._make_request(endpoint, method="GET", params=params)
+    @classmethod
+    async def notify(cls, slug, params, config_path: str = "config.yml", use_proxy: bool = False) -> Dict[str, Any]:
+        async with cls(config_path, use_proxy) as client:
+            endpoint = "/" + slug
+            return await client._make_request(endpoint, method="GET", params=params)
 
     @classmethod
     def get_instance(cls, config_path: str = "config.yml", use_proxy: bool = False) -> 'FWAlertClient':
