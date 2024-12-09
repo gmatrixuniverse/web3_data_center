@@ -1420,7 +1420,6 @@ class DataCenter:
             # Get funding paths for both addresses
             path1 = await self.get_funding_path(address1, max_depth, stop_at_cex)
             path2 = await self.get_funding_path(address2, max_depth, stop_at_cex)
-            
             # Create maps for faster lookup
             path1_map = {step['address']: step for step in path1}
             path2_map = {step['address']: step for step in path2}
@@ -1558,6 +1557,7 @@ class DataCenter:
             logger.error(f"Error getting latest swap orders: {str(e)}")
             return []
 
+    @file_cache(namespace="contract_creator_tx", ttl=3600*24)  # Cache for 24 hours
     async def get_contract_creator_tx(self, contract_address: str) -> Optional[str]:
         """
         Get the transaction hash that created a contract.
@@ -1570,6 +1570,7 @@ class DataCenter:
         """
         return await self.opensearch_client.get_contract_creator_tx(contract_address)
 
+    @file_cache(namespace="contract_creator", ttl=3600*24)  # Cache for 24 hours
     async def get_contract_creator(self, contract_address: str) -> Optional[str]:
         """
         Get the address that created a contract.

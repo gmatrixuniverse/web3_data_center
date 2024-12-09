@@ -82,13 +82,14 @@ async def test_funding_relationship_cache():
         # Initialize DataCenter
         async with DataCenter() as dc:
             # Test addresses
-            address1 = "0x7dcf4527bdf7503b156f7824b0fc6b11304ed995"
-            address2 = "0x04bda42de3bc32abb00df46004204424d4cf8287"
+            address1 = "0x3dA747C9c46fcb81e5b049FC1722D83455B4a92a"
+            address2 = "0x889d1e4e35deCDaa83C3593e394169AF8cD95750"
             
             # Test 1: First call (should hit the database)
             print("\nTest 1: First call")
             start = time.time()
             result1 = await dc.check_funding_relationship(address1, address2)
+            print(result1)
             duration1 = time.time() - start
             print(f"First call duration: {duration1:.2f} seconds")
             print(f"Result: {result1}")
@@ -98,6 +99,7 @@ async def test_funding_relationship_cache():
             start = time.time()
             result2 = await dc.check_funding_relationship(address1, address2)
             duration2 = time.time() - start
+            print(result2)
             print(f"Second call duration: {duration2:.2f} seconds")
             print(f"Cache hit? {'Yes' if duration2 < duration1 else 'No'}")
             
@@ -133,7 +135,7 @@ async def main():
     print(f"Cache directory: {get_cache_dir()}")
     
     # Run tests
-    await test_funding_path_cache()
+    # await test_funding_path_cache()
     await test_funding_relationship_cache()
     
     # Clean up cache after tests
