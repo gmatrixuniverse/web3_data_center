@@ -1,4 +1,3 @@
-
 import asyncio
 from typing import Dict, List, Optional, Any
 from ..clients import *
@@ -445,29 +444,38 @@ class DataCenter:
 
     async def close(self):
         """Close all clients and cleanup resources"""
-        clients = [
-            self.geckoterminal_client,
-            self.gmgn_client,
-            self.birdeye_client,
-            self.solscan_client,
-            self.goplus_client,
-            self.dexscreener_client,
-            self.chainbase_client,
-            self.etherscan_client,
-            self.opensearch_client,
-            self.funding_client,
-            self.label_client
-        ]
+        for client in self._clients.values():
+            if hasattr(client, 'close') and callable(client.close):
+                if asyncio.iscoroutinefunction(client.close):
+                    await client.close()
+                else:
+                    client.close()
+            elif hasattr(client, 'session') and hasattr(client.session, 'close'):
+                await client.session.close()
         
-        for client in clients:
-            if client is not None and hasattr(client, 'close'):
-                try:
-                    if asyncio.iscoroutinefunction(client.close):
-                        await client.close()
-                    else:
-                        client.close()
-                except Exception as e:
-                    logger.warning(f"Error closing client {client.__class__.__name__}: {str(e)}")
+        # clients = [
+        #     self.geckoterminal_client,
+        #     self.gmgn_client,
+        #     self.birdeye_client,
+        #     self.solscan_client,
+        #     self.goplus_client,
+        #     self.dexscreener_client,
+        #     self.chainbase_client,
+        #     self.etherscan_client,
+        #     self.opensearch_client,
+        #     self.funding_client,
+        #     self.label_client
+        # ]
+        
+        # for client in clients:
+        #     if client is not None and hasattr(client, 'close'):
+        #         try:
+        #             if asyncio.iscoroutinefunction(client.close):
+        #                 await client.close()
+        #             else:
+        #                 client.close()
+        #         except Exception as e:
+        #             logger.warning(f"Error closing client {client.__class__.__name__}: {str(e)}")
 
     async def __aenter__(self):
         """Async context manager entry"""
@@ -1113,8 +1121,8 @@ class DataCenter:
                         tree[addr] = None
 
                 # Check labels for all funders in this batch
-                if funders_to_check and self.label_client:
-                    funder_labels = self.label_client.get_addresses_labels(list(funders_to_check))
+                if funders_to_check:
+                    funder_labels = self._get_client('label').get_addresses_labels(list(funders_to_check))
                     funder_is_cex = {
                         label_info['address']: label_info['is_cex']
                         for label_info in funder_labels
@@ -1340,7 +1348,7 @@ class DataCenter:
                     # Get labels for the batch
                     if self.label_client:
                         try:
-                            label_results = self.label_client.get_addresses_labels(pending_funders, chain_id=0)
+                            label_results = self._get_client('label').get_addresses_labels(pending_funders, chain_id=0)
                             label_map = {
                                 result['address'].lower(): result 
                                 for result in label_results
@@ -1400,7 +1408,7 @@ class DataCenter:
             if pending_funders:
                 if self.label_client:
                     try:
-                        label_results = self.label_client.get_addresses_labels(pending_funders, chain_id=0)
+                        label_results = self._get_client('label').get_addresses_labels(pending_funders, chain_id=0)
                         label_map = {
                             result['address'].lower(): result 
                             for result in label_results

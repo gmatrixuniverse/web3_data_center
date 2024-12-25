@@ -21,7 +21,7 @@ class Web3LabelClient:
             raise ValueError("Either db_client or config_path must be provided")
             
         from .postgresql_client import PostgreSQLClient
-        self.db_client = db_client or PostgreSQLClient(config_path=config_path)
+        self.db_client = db_client or PostgreSQLClient(config_path=config_path, db_section='labels')
         self._label_cache = {}  # Cache for label results
         self._cache_timestamps = {}  # Timestamps for cache entries
         self._cache_ttl = cache_ttl
@@ -87,7 +87,10 @@ class Web3LabelClient:
                 me.entity,
                 me.category AS type,
                 mca.name_tag,
-                mca.entity
+                mca.entity,
+                mca.labels,
+                mca.is_ca,
+                mca.is_seed
             FROM multi_chain_addresses mca
             LEFT JOIN multi_entity me ON mca.entity = me.entity
             WHERE mca.chain_id = %(chain_id)s AND mca.address = ANY(%(addresses)s)
@@ -96,8 +99,21 @@ class Web3LabelClient:
             # Execute query with address list as a single parameter
             try:
                 results = self.db_client.execute_query(query, {"chain_id": 0 if chain_id == 1 else chain_id, "addresses": cleaned_addresses})
-                # logger.info(f"Found {len(results)} labels for {len(cleaned_addresses)} addresses")
-                return results
+                processed_results = []
+                for row in results:
+                    type_str = row['type'] if row['type'] is not None else ''
+                    info = {
+                        'address': row['address'],
+                        'entity': row['entity'],
+                        'type': type_str,
+                        'name_tag': row['name_tag'] or '',
+                        'labels': row['labels'].split(',') if row['labels'] else [],
+                        'is_contract': bool(row['is_ca']),
+                        'is_seed': bool(row['is_seed']),
+                        'is_cex': 'CEX' in type_str.upper() or 'EXCHANGE' in type_str.upper(),
+                    }
+                    processed_results.append(info)
+                return processed_results
             except Exception as e:
                 logger.error(f"Error querying labels: {str(e)}")
                 raise
