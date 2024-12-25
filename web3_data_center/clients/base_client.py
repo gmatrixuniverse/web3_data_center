@@ -60,15 +60,11 @@ class BaseClient:
 
     async def __aenter__(self):
         """Async context manager entry"""
-        if not self.session:
-            self.session = aiohttp.ClientSession()
         return self
 
     async def __aexit__(self, exc_type, exc_val, exc_tb):
         """Async context manager exit"""
-        if self.session:
-            await self.session.close()
-            self.session = None
+        await self.close()
 
     async def close(self):
         """Close the client and cleanup resources"""
@@ -190,6 +186,9 @@ class BaseClient:
                 proxy=self.proxy
             ) as response:
                 response.raise_for_status()
+
+                # text = await response.text()
+                # print(text)  # For debugging
                 return await self._handle_json_response(response)
         except aiohttp.ClientResponseError as e:
             logging.error(f"HTTP error {e.status}: {e.message}")
@@ -223,9 +222,22 @@ class BaseClient:
 
     async def _handle_json_response(self, response: aiohttp.ClientResponse) -> Dict[str, Any]:
         try:
-            return await response.json(content_type=None)
+            text = await response.text()
+            
+            # If it's not JSON content type, try to parse anyway but don't error on mimetype
+            if response.content_type == 'text/plain':
+                try:
+                    return json.loads(text)
+                except json.JSONDecodeError:
+                    # If it's not JSON, return an empty dict
+                    return text
+            
+            # For application/json, use the standard json parser
+            return await response.json()
+            
         except json.JSONDecodeError as e:
             logging.error(f"Failed to decode JSON response: {str(e)}")
+            logging.error(f"Raw response: {text}")
             raise
 
     async def _make_concurrent_requests(

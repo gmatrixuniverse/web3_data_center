@@ -1,5 +1,6 @@
 import psycopg2
 import psycopg2.extras
+import psycopg2.pool
 from psycopg2.extensions import register_adapter, AsIs
 from typing import Any, Dict, List, Optional, Union
 from urllib.parse import quote
@@ -7,7 +8,7 @@ import logging
 from .base_database_client import BaseDatabaseClient
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.WARNING)  # Set default level to INFO
+logger.setLevel(logging.INFO)  # Set default level to INFO
 
 # Register list adapter for PostgreSQL arrays
 def adapt_list(lst):
@@ -19,10 +20,27 @@ def adapt_list(lst):
 register_adapter(list, adapt_list)
 
 class PostgreSQLClient(BaseDatabaseClient):
-    def __init__(self, config_path: str = None, connection_string: str = None):
-        """Initialize PostgreSQL client with either config or connection string"""
+    _pool = None  # Class-level connection pool
+    
+    def __init__(self, config_path: str = None, connection_string: str = None, db_section: str = None):
+        """
+        Initialize PostgreSQL client with either config or connection string.
+        
+        Args:
+            config_path: Path to YAML config file
+            connection_string: Direct connection string
+            db_section: Database section in config (e.g., 'local', 'labels')
+        """
         self._cursor = None  # Initialize cursor before super()
-        super().__init__(config_path, connection_string)
+        super().__init__(config_path, connection_string, db_section)
+        
+        # Initialize connection pool if not already created
+        if PostgreSQLClient._pool is None:
+            PostgreSQLClient._pool = psycopg2.pool.ThreadedConnectionPool(
+                minconn=1,
+                maxconn=20,  # Adjust based on your needs
+                dsn=self.connection_string
+            )
         
     def __del__(self):
         """Ensure connection is closed on deletion"""
@@ -30,19 +48,41 @@ class PostgreSQLClient(BaseDatabaseClient):
         
     @property
     def connection(self):
-        """Get the current connection, establishing one if needed"""
+        """Get a connection from the pool, establishing pool if needed"""
         if not self._connection or self._connection.closed:
             self.connect()
         return self._connection
         
-    @connection.setter
-    def connection(self, value):
-        """Set the connection"""
-        if hasattr(self, '_connection') and self._connection and not self._connection.closed:
-            self.disconnect()
-        self._connection = value
-        self._cursor = None  # Reset cursor when connection changes
+    def connect(self):
+        """Get a connection from the pool"""
+        if PostgreSQLClient._pool is None:
+            PostgreSQLClient._pool = psycopg2.pool.ThreadedConnectionPool(
+                minconn=1,
+                maxconn=20,  # Adjust based on your needs
+                dsn=self.connection_string
+            )
         
+        logger.info(f"Getting connection from pool for database: {self.db_section}")
+        self._connection = PostgreSQLClient._pool.getconn()
+        self._cursor = None
+        
+    def disconnect(self):
+        """Return connection to the pool"""
+        if hasattr(self, '_connection') and self._connection:
+            if self._cursor:
+                self._cursor.close()
+                self._cursor = None
+            
+            if not self._connection.closed:
+                if PostgreSQLClient._pool:
+                    PostgreSQLClient._pool.putconn(self._connection)
+                    logger.info(f"Returned connection to pool for database: {self.db_section}")
+                else:
+                    self._connection.close()
+                    logger.info(f"Closed connection for database: {self.db_section}")
+            
+            self._connection = None
+            
     @property
     def cursor(self):
         """Get cursor, creating one if needed"""
@@ -50,34 +90,6 @@ class PostgreSQLClient(BaseDatabaseClient):
             self._cursor = self.connection.cursor(cursor_factory=psycopg2.extras.RealDictCursor)
         return self._cursor
         
-    def connect(self) -> None:
-        """Establish connection to PostgreSQL database"""
-        try:
-            if not self._connection or self._connection.closed:
-                self._connection = psycopg2.connect(
-                    self.connection_string,
-                    cursor_factory=psycopg2.extras.RealDictCursor
-                )
-                self._connection.autocommit = True
-                # logger.info("Connected to PostgreSQL database")
-        except Exception as e:
-            logger.error(f"Failed to connect to PostgreSQL: {str(e)}")
-            raise
-            
-    def disconnect(self) -> None:
-        """Close PostgreSQL connection"""
-        try:
-            if hasattr(self, '_cursor') and self._cursor and not self._cursor.closed:
-                self._cursor.close()
-            if hasattr(self, '_connection') and self._connection and not self._connection.closed:
-                self._connection.close()
-                # logger.info("Disconnected from PostgreSQL database")
-        except Exception as e:
-            logger.error(f"Error disconnecting from PostgreSQL: {str(e)}")
-        finally:
-            self._cursor = None
-            self._connection = None
-            
     def execute_query(
         self,
         query: str,
@@ -89,72 +101,88 @@ class PostgreSQLClient(BaseDatabaseClient):
             if parameters is None:
                 parameters = []
             elif isinstance(parameters, (list, tuple)):
-                # Keep parameters as list for proper handling
                 parameters = list(parameters)
             
-            # Detailed parameter validation and logging
-            # logger.info(f"Executing query: {query}")
-            # logger.info(f"Parameters: {parameters}")
-            
-            # Count placeholders in query
-            placeholder_count = query.count('%s')
-            if isinstance(parameters, (list, tuple)):
-                param_count = len(parameters)
-                # logger.info(f"Number of placeholders in query: {placeholder_count}")
-                # logger.info(f"Number of parameters provided: {param_count}")
-                
-                if placeholder_count != param_count:
-                    error_msg = f"Mismatch between number of placeholders ({placeholder_count}) and parameters ({param_count})"
-                    logger.error(error_msg)
-                    raise ValueError(error_msg)
+            # logger.info(f"Executing query: {query[:200]}...")  # Log first 200 chars of query
             
             # Execute query with processed parameters
             try:
                 self.cursor.execute(query, parameters)
-                results = self.cursor.fetchall()
                 
-                # Log success
-                # logger.info(f"Query executed successfully. Returned {len(results)} rows.")
-                return [dict(row) for row in results]
+                # For SELECT queries, fetch results
+                if query.strip().upper().startswith(('SELECT', 'RETURNING')):
+                    results = self.cursor.fetchall()
+                    # logger.info(f"Query returned {len(results)} rows")
+                    return [dict(row) for row in results]
+                else:
+                    # For other queries (INSERT, UPDATE, DELETE, etc.), commit the transaction
+                    affected = self.cursor.rowcount
+                    self._connection.commit()
+                    logger.info(f"Query affected {affected} rows")
+                    return []
+                    
             except Exception as e:
+                self._connection.rollback()
                 logger.error(f"Error during query execution: {str(e)}")
                 logger.error(f"Final query: {self.cursor.mogrify(query, parameters).decode()}")
                 raise
             
         except Exception as e:
-            if self._connection and not self._connection.closed:
-                self._connection.rollback()
-            
-            # Detailed error logging
             logger.error(f"Error executing query: {str(e)}")
             logger.error(f"Query: {query}")
             logger.error(f"Parameters: {parameters}")
-            
             raise
             
+    async def execute(self, query: str, parameters: Union[List[Any], Dict[str, Any], None] = None) -> List[Dict[str, Any]]:
+        """Execute a query asynchronously"""
+        result = self.execute_query(query, parameters)
+        self.connection.commit()
+        return result
+
+    async def close(self) -> None:
+        """Close the database connection asynchronously"""
+        self.disconnect()
+
     def get_config_section(self) -> str:
         """Get config section name for PostgreSQL"""
-        return "labels"  # Using the labels section for Web3 label database
+        return "database"
         
     def build_connection_string(self, config: Dict[str, Any]) -> Optional[str]:
         """Build PostgreSQL connection string from config"""
         try:
+            # Map config keys to expected keys
+            key_mapping = {
+                'username': 'username',
+                'user': 'username',
+                'password': 'password',
+                'host': 'host',
+                'port': 'port',
+                'database': 'database',
+                'name': 'database'
+            }
+            
+            # Build normalized config
+            normalized_config = {}
+            for config_key, expected_key in key_mapping.items():
+                if config_key in config:
+                    normalized_config[expected_key] = config[config_key]
+            
             required_fields = ['username', 'password', 'host', 'port', 'database']
-            if not all(field in config for field in required_fields):
-                logger.warning("Missing required PostgreSQL configuration fields")
-                return None
+            if not all(field in normalized_config for field in required_fields):
+                missing = [f for f in required_fields if f not in normalized_config]
+                raise ValueError(f"Missing required PostgreSQL configuration fields: {missing}")
                 
-            username = config['username']
-            password = quote(config['password'])
-            host = config['host']
-            port = config['port']
-            database = config['database']
+            username = normalized_config['username']
+            password = quote(normalized_config['password'])
+            host = normalized_config['host']
+            port = normalized_config['port']
+            database = normalized_config['database']
             
             return f"postgresql://{username}:{password}@{host}:{port}/{database}"
             
         except Exception as e:
             logger.error(f"Error building connection string: {str(e)}")
-            return None
+            raise
             
     def execute_batch(
         self,
@@ -163,10 +191,16 @@ class PostgreSQLClient(BaseDatabaseClient):
     ) -> None:
         """Execute batch operation with multiple parameter sets"""
         try:
-            psycopg2.extras.execute_batch(self.cursor, query, parameters)
+            # Use faster_execute_batch for better performance
+            psycopg2.extras.execute_batch(
+                self.cursor,
+                query,
+                parameters,
+                page_size=1000  # Process 1000 rows at a time
+            )
+            self._connection.commit()
         except Exception as e:
-            if self._connection and not self._connection.closed:
-                self._connection.rollback()
+            self._connection.rollback()
             logger.error(f"Error executing batch operation: {str(e)}")
             raise
             

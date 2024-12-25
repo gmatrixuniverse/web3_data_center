@@ -25,6 +25,7 @@ class TwitterMonitorClient(BaseClient):
         self.list_route = self.config['api']['x']['list_route']
         self.timeline_route = self.config['api']['x']['timeline_route']
         self.query_id = self.config['api']['x']['query_id']
+        self._user_id_cache: Dict[str, str] = {}  # Cache for user IDs: screen_name -> user_id
 
     def set_parameters(self, **kwargs):
         for key, value in kwargs.items():
@@ -215,6 +216,144 @@ class TwitterMonitorClient(BaseClient):
         
         return new_posts
 
+    async def check_for_new_posts_by_user(self, user_identifier: str) -> List[Dict[str, Any]]:
+        """
+        Check for new posts from a specific user since the last check time.
+        
+        Args:
+            user_identifier (str): Either a Twitter user ID or screen name (handle without @)
+            
+        Returns:
+            List[Dict[str, Any]]: A list of new posts found
+        """
+        new_posts = []
+        current_time = datetime.now(timezone.utc)
+        
+        # If the identifier is not numeric, assume it's a screen name and get the user ID
+        user_id = user_identifier
+        if not user_identifier.isdigit():
+            if user_identifier.startswith("@"):
+                user_identifier = user_identifier[1:]
+            # print("Try user ID first")
+            user_id = await self.get_user_id(user_identifier)
+            if not user_id:
+                logger.error(f"Could not find user ID for screen name: {user_identifier}")
+                return []
+        
+        if not self.timeline_route:
+            raise ValueError("timeline_route is not initialized")
+        
+        try:
+            endpoint = f"/graphql/UserTweets"
+            variables = {
+                "userId": user_id,
+                "count": 20,
+                "includePromotedContent": False,
+                "withQuickPromoteEligibilityTweetFields": True,
+                "withVoice": True,
+                "withV2Timeline": True
+            }
+            features = {
+                "responsive_web_graphql_exclude_directive_enabled": True,
+                "verified_phone_label_enabled": False,
+                "creator_subscriptions_tweet_preview_api_enabled": True,
+                "responsive_web_graphql_timeline_navigation_enabled": True,
+                "responsive_web_graphql_skip_user_profile_image_extensions_enabled": False,
+                "c9s_tweet_anatomy_moderator_badge_enabled": True,
+                "tweetypie_unmention_optimization_enabled": True,
+                "responsive_web_edit_tweet_api_enabled": True,
+                "graphql_is_translatable_rweb_tweet_is_translatable_enabled": True,
+                "view_counts_everywhere_api_enabled": True,
+                "longform_notetweets_consumption_enabled": True,
+                "responsive_web_twitter_article_tweet_consumption_enabled": False,
+                "tweet_awards_web_tipping_enabled": False,
+                "freedom_of_speech_not_reach_fetch_enabled": True,
+                "standardized_nudges_misinfo": True,
+                "tweet_with_visibility_results_prefer_gql_limited_actions_policy_enabled": True,
+                "rweb_video_timestamps_enabled": True,
+                "longform_notetweets_rich_text_read_enabled": True,
+                "longform_notetweets_inline_media_enabled": True,
+                "responsive_web_enhance_cards_enabled": False,
+                "rweb_tipjar_consumption_enabled": False,
+                'creator_subscriptions_quote_tweet_preview_enabled': False,
+                'articles_preview_enabled': False,
+                'communities_web_enable_tweet_community_results_fetch': False,
+                'rweb_lists_timeline_redesign_enabled': False,
+                'responsive_web_media_download_video_enabled': False
+                
+            }
+            
+            params = {
+                "variables": json.dumps(variables),
+                "features": json.dumps(features)
+            }
+            # print("Try tweets")
+            response = await self._make_request(method="GET", endpoint=endpoint, params=params)
+            if not response:
+                logger.warning(f"Empty response for user {user_identifier}")
+                return []
+            
+            if not isinstance(response, dict):
+                logger.error(f"Unexpected response type for user {user_identifier}. Expected dict, got {type(response)}. Response: {response}")
+                return []
+                
+            user_data = response.get('data', {}).get('user', {}).get('result', {})
+            if not isinstance(user_data, dict):
+                logger.error(f"Invalid user data format for user {user_identifier}. Got: {user_data}")
+                return []
+                
+            timeline = user_data.get('timeline_v2', {}).get('timeline', {})
+            if not isinstance(timeline, dict):
+                logger.error(f"Invalid timeline format for user {user_identifier}. Got: {timeline}")
+                return []
+                
+            instructions = timeline.get('instructions', [])
+            for instruction in instructions:
+                if instruction.get('type') == 'TimelineAddEntries':
+                    entries = instruction.get('entries', [])
+                    for entry in entries:
+                        if entry.get('content', {}).get('entryType') == 'TimelineTimelineItem':
+                            tweet = entry.get('content', {}).get('itemContent', {}).get('tweet_results', {}).get('result', {})
+                            if tweet:
+                                tweet_id = tweet.get('rest_id')
+                                if tweet_id is None:
+                                    continue
+                                
+                                legacy = tweet.get('legacy', {})
+                                created_at = datetime.strptime(legacy.get('created_at', ''), '%a %b %d %H:%M:%S +0000 %Y').replace(tzinfo=timezone.utc)
+                                
+                                if created_at > self.last_check_time and tweet_id not in self.processed_tweets:
+                                    self.processed_tweets.append(tweet_id)
+                                    user = tweet.get('core', {}).get('user_results', {}).get('result', {}).get('legacy', {})
+                                    
+                                    # Get the tweet text and URLs
+                                    text = legacy.get('full_text', '')
+                                    urls = legacy.get('entities', {}).get('urls', [])
+                                    
+                                    # Replace shortened URLs with expanded ones
+                                    for url in urls:
+                                        short_url = url.get('url', '')
+                                        expanded_url = url.get('expanded_url', '')
+                                        if short_url and expanded_url:
+                                            text = text.replace(short_url, expanded_url)
+                                    
+                                    new_post = {
+                                        'id': tweet_id,
+                                        'text': text,
+                                        'user': user.get('screen_name'),
+                                        'created_at': created_at
+                                    }
+                                    new_posts.append(new_post)
+                                    logger.debug(f"New post added: {new_post}")
+            
+            self.last_check_time = current_time
+            logger.info(f"Found {len(new_posts)} new posts from user {user_identifier}")
+            return new_posts
+            
+        except Exception as e:
+            logger.error(f"Error checking new posts for user {user_identifier}: {str(e)}")
+            return []
+
     def _parse_search_results(self, data):
         search_results = []
         instructions = data.get('data', {}).get('search_by_raw_query', {}).get('search_timeline', {}).get('timeline', {}).get('instructions', [])
@@ -255,7 +394,7 @@ class TwitterMonitorClient(BaseClient):
         params = {
             "variables": json.dumps(variables)
         }
-
+        
         try:
             data = await self._make_request(method="GET", endpoint=endpoint, params=params)
             return self._parse_search_results(data)
@@ -275,51 +414,69 @@ class TwitterMonitorClient(BaseClient):
         return await self.search_tweets(query, count)
 
     async def get_user_id(self, screen_name: str) -> Optional[str]:
+        if screen_name.startswith("@"):
+            screen_name = screen_name[1:]
+            
+        if screen_name in self._user_id_cache:
+            logger.debug(f"Cache hit for user {screen_name}")
+            return self._user_id_cache[screen_name]
+            
         endpoint = "/graphql/UserByScreenName"
         variables = {
             "screen_name": screen_name,
             "withSafetyModeUserFields": True,
             "withHighlightedLabel": True
         }
-        params = {"variables": json.dumps(variables)}
+        features = {
+            "hidden_profile_likes_enabled": True,
+            "hidden_profile_subscriptions_enabled": True,
+            "responsive_web_graphql_exclude_directive_enabled": True,
+            "verified_phone_label_enabled": False,
+            "subscriptions_verification_info_is_identity_verified_enabled": True,
+            "subscriptions_verification_info_verified_since_enabled": True,
+            "highlights_tweets_tab_ui_enabled": True,
+            "creator_subscriptions_tweet_preview_api_enabled": True,
+            "responsive_web_graphql_skip_user_profile_image_extensions_enabled": False,
+            "responsive_web_graphql_timeline_navigation_enabled": True,
+            "creator_subscriptions_quote_tweet_preview_enabled": False,  # Required
+            "articles_preview_enabled": True,  # Required
+            "rweb_tipjar_consumption_enabled": True,  # Required
+            "communities_web_enable_tweet_community_results_fetch": True  # Required
+        }
+        params = {
+            "variables": json.dumps(variables),
+            "features": json.dumps(features)
+        }
         
         try:
             data = await self._make_request(method="GET", endpoint=endpoint, params=params)
-            # print(data)
-            user_data = data.get('data', {}).get('user', {}).get('result', {})
-            user_id = user_data.get('rest_id')
+            logger.debug(f"Raw response for user {screen_name}: {json.dumps(data, indent=2)}")
+            
+            if not data:
+                logger.warning(f"Empty response when getting user ID for {screen_name}")
+                return None
+                
+            if 'errors' in data:
+                logger.warning(f"API errors for {screen_name}: {data['errors']}")
+                return None
+                
+            user = data.get('data', {}).get('user', {}).get('result', {})
+            if not user:
+                logger.warning(f"User data not found in response for {screen_name}: {data}")
+                return None
+                
+            user_id = user.get('rest_id')
             if user_id:
-                logger.info(f"Found user ID for {screen_name}: {user_id}")
+                logger.info(f"Found user ID {user_id} for {screen_name}")
+                self._user_id_cache[screen_name] = user_id
                 return user_id
             else:
-                logger.warning(f"User ID not found for {screen_name}")
+                logger.warning(f"User ID not found in user data for {screen_name}: {user}")
                 return None
+                
         except Exception as e:
             logger.error(f"Error getting user ID for {screen_name}: {str(e)}")
             return None
-
-    async def get_user_by_username(self, screen_name: str) -> Optional[str]:
-        endpoint = "/graphql/UserByScreenName"
-        variables = {
-            "screen_name": screen_name,
-            "withSafetyModeUserFields": True,
-            "withHighlightedLabel": True
-        }
-        params = {"variables": json.dumps(variables)}
-        
-        try:
-            data = await self._make_request(method="GET", endpoint=endpoint, params=params)
-            user_data = data.get('data', {}).get('user', {}).get('result', {})
-            if user_data:
-                logger.info(f"Found user data for {screen_name}")
-                return user_data
-            else:
-                logger.warning(f"User data not found for {screen_name}")
-                return None
-        except Exception as e:
-            logger.error(f"Error getting user data for {screen_name}: {str(e)}")
-            return None
-
 
     async def get_tweet_by_rest_id(self, tweet_id: str) -> Optional[Dict[str, Any]]:
         endpoint = "/graphql/TweetResultByRestId"
@@ -335,9 +492,9 @@ class TwitterMonitorClient(BaseClient):
         params = {"variables": json.dumps(variables)}
         
         try:
-            data = await self._make_request(method="GET", endpoint=endpoint, params=params)
+            data = await self._make_request_with_retry(method="GET", endpoint=endpoint, params=params)
             tweet_result = data.get('data', {}).get('tweetResult', {}).get('result', {})
-            print(f"Tweet result: {tweet_result}")
+            # print(f"Tweet result: {tweet_result}")
             if tweet_result and tweet_result.get('__typename') == 'Tweet':
                 logger.info(f"Found tweet data for ID {tweet_id}")
                 legacy = tweet_result.get('legacy', {})
@@ -404,7 +561,7 @@ class TwitterMonitorClient(BaseClient):
             since_date = most_recent_sunday
         
         return since_date.strftime('%Y-%m-%d'), today.strftime('%Y-%m-%d')
-    
+
     async def get_list_members(self):
         """Get the current members of the monitored Twitter list."""
         if not self.list_route or not self.list_id:

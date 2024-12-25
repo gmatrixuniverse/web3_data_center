@@ -1,7 +1,7 @@
+
 import asyncio
 from typing import Dict, List, Optional, Any
 from ..clients import *
-from ..clients.database.web3_label_client import Web3LabelClient
 from ..models.token import Token
 from ..models.holder import Holder
 from ..models.price_history_point import PriceHistoryPoint
@@ -31,32 +31,103 @@ class DataCenter:
         logging.getLogger('opensearch.transport').setLevel(logging.WARNING)
         logging.getLogger('opensearch.connection.http_urllib3').setLevel(logging.WARNING)
         
-        # Load configuration
-        
-        self.geckoterminal_client = GeckoTerminalClient(config_path=config_path)
-        self.gmgn_client = GMGNAPIClient(config_path=config_path)
-        self.birdeye_client = BirdeyeClient(config_path=config_path)
-        self.solscan_client = SolscanClient(config_path=config_path)
-        self.goplus_client = GoPlusClient(config_path=config_path)
-        self.dexscreener_client = DexScreenerClient(config_path=config_path)
-        self.chainbase_client = ChainbaseClient(config_path=config_path)
-        self.etherscan_client = EtherscanClient(config_path=config_path)
-        self.opensearch_client = OpenSearchClient(config_path=config_path)
-        self.funding_client = FundingClient(config_path=config_path)
-        self.w3_client = Web3(Web3.HTTPProvider("http://192.168.0.105:8545"))
-        self.contract_manager = ContractManager("http://192.168.0.105:8545")
-        self.analyzer  = AnalyzerManager()
-        self.decoder = DecoderManager()
-        
-        # Initialize Web3LabelClient from config
-        try:
-            self.label_client = Web3LabelClient(config_path=config_path)
-            # logger.info("Successfully initialized Web3LabelClient")
-        except Exception as e:
-            logger.error(f"Failed to initialize Web3LabelClient: {str(e)}")
-            self.label_client = None
-
+        self._config_path = config_path
+        self._clients = {}
         self.cache = {}
+        
+    def _get_client(self, client_type: str):
+        if client_type not in self._clients:
+            if client_type == 'geckoterminal':
+                self._clients[client_type] = GeckoTerminalClient(config_path=self._config_path)
+            elif client_type == 'gmgn':
+                self._clients[client_type] = GMGNAPIClient(config_path=self._config_path)
+            elif client_type == 'birdeye':
+                self._clients[client_type] = BirdeyeClient(config_path=self._config_path)
+            elif client_type == 'solscan':
+                self._clients[client_type] = SolscanClient(config_path=self._config_path)
+            elif client_type == 'goplus':
+                self._clients[client_type] = GoPlusClient(config_path=self._config_path)
+            elif client_type == 'dexscreener':
+                self._clients[client_type] = DexScreenerClient(config_path=self._config_path)
+            elif client_type == 'chainbase':
+                self._clients[client_type] = ChainbaseClient(config_path=self._config_path)
+            elif client_type == 'etherscan':
+                self._clients[client_type] = EtherscanClient(config_path=self._config_path)
+            elif client_type == 'opensearch':
+                self._clients[client_type] = OpenSearchClient(config_path=self._config_path)
+            elif client_type == 'funding':
+                self._clients[client_type] = FundingClient(config_path=self._config_path)
+            elif client_type == 'web3':
+                self._clients[client_type] = Web3(Web3.HTTPProvider("http://192.168.0.105:8545"))
+            elif client_type == 'contract_manager':
+                self._clients[client_type] = ContractManager("http://192.168.0.105:8545")
+            elif client_type == 'analyzer':
+                self._clients[client_type] = AnalyzerManager()
+            elif client_type == 'decoder':
+                self._clients[client_type] = DecoderManager()
+            elif client_type == 'label':
+                self._clients[client_type] = Web3LabelClient(config_path=self._config_path)
+        return self._clients[client_type]
+    
+    @property
+    def geckoterminal_client(self):
+        return self._get_client('geckoterminal')
+        
+    @property
+    def gmgn_client(self):
+        return self._get_client('gmgn')
+        
+    @property
+    def birdeye_client(self):
+        return self._get_client('birdeye')
+        
+    @property
+    def solscan_client(self):
+        return self._get_client('solscan')
+        
+    @property
+    def goplus_client(self):
+        return self._get_client('goplus')
+        
+    @property
+    def dexscreener_client(self):
+        return self._get_client('dexscreener')
+        
+    @property
+    def chainbase_client(self):
+        return self._get_client('chainbase')
+        
+    @property
+    def etherscan_client(self):
+        return self._get_client('etherscan')
+        
+    @property
+    def opensearch_client(self):
+        return self._get_client('opensearch')
+        
+    @property
+    def funding_client(self):
+        return self._get_client('funding')
+        
+    @property
+    def w3_client(self):
+        return self._get_client('web3')
+        
+    @property
+    def contract_manager(self):
+        return self._get_client('contract_manager')
+        
+    @property
+    def analyzer(self):
+        return self._get_client('analyzer')
+        
+    @property
+    def decoder(self):
+        return self._get_client('decoder')
+        
+    @property
+    def label_client(self):
+        return self._get_client('label')
         
     async def get_address_labels(self, addresses: List[str], chain_id: int = 0) -> List[Dict[str, Any]]:
         """Get labels for a list of addresses"""

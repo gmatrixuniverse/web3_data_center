@@ -24,6 +24,8 @@ wheels/
 .installed.cfg
 *.egg
 
+example/twitter_monitor_example.py
+
 # PyInstaller
 #  Usually these files are written by a python script from a template
 #  before PyInstaller builds the exe, so as to inject date/other infos into it.
@@ -121,3 +123,7 @@ contracts.csv
 contract_metrics.csv
 tokens_with_50plus_initial_snipers.csv
 tokens.csv
+contract_metrics.csv
+potential_scams_5346_best.csv
+transfer_error_404_20241216.csv
+transfer_log_errors.txt

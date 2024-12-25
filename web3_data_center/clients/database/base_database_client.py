@@ -7,16 +7,18 @@ import logging
 logger = logging.getLogger(__name__)
 
 class BaseDatabaseClient(ABC):
-    def __init__(self, config_path: str = None, connection_string: str = None):
+    def __init__(self, config_path: str = None, connection_string: str = None, db_section: str = None):
         """
         Initialize database client with either config path or connection string.
         
         Args:
             config_path: Path to YAML config file
             connection_string: Direct connection string
+            db_section: Database section in config file (e.g., 'local', 'labels')
         """
         self._connection = None
         self.connection_string = connection_string
+        self.db_section = db_section
         
         if config_path and not connection_string:
             self.connection_string = self._init_from_config(config_path)
@@ -43,6 +45,16 @@ class BaseDatabaseClient(ABC):
         """Execute a query and return results"""
         pass
         
+    @abstractmethod
+    def get_config_section(self) -> str:
+        """Get the database type section from config (e.g., 'database')"""
+        pass
+        
+    @abstractmethod
+    def build_connection_string(self, config: Dict[str, Any]) -> Optional[str]:
+        """Build connection string from config"""
+        pass
+        
     def _init_from_config(self, config_path: str) -> Optional[str]:
         """
         Initialize connection string from config file.
@@ -51,49 +63,30 @@ class BaseDatabaseClient(ABC):
             config_path: Path to YAML config file
             
         Returns:
-            Connection string if successful, None otherwise
+            Optional[str]: Connection string if successful, None otherwise
         """
         try:
             with open(config_path, 'r') as f:
                 config = yaml.safe_load(f)
                 
-            db_config = config.get('database', {}).get(self.get_config_section(), {})
-            if not db_config:
-                logger.warning(f"No database configuration found for {self.get_config_section()}")
-                return None
+            section = self.get_config_section()
+            if section not in config:
+                raise ValueError(f"Config section '{section}' not found")
                 
-            conn_str = self.build_connection_string(db_config)
-            if not conn_str:
-                logger.warning("Failed to build connection string from config")
-                return None
-                
-            return conn_str
+            db_config = config[section]
+            
+            # Handle nested database configurations
+            if self.db_section:
+                if self.db_section not in db_config:
+                    raise ValueError(f"Database section '{self.db_section}' not found in {section}")
+                db_config = db_config[self.db_section]
+            
+            return self.build_connection_string(db_config)
             
         except Exception as e:
             logger.error(f"Error initializing from config: {str(e)}")
-            return None
+            raise
             
-    @abstractmethod
-    def get_config_section(self) -> str:
-        """
-        Get the configuration section name for this database client.
-        For example: 'postgresql', 'mongodb', 'labels', etc.
-        """
-        pass
-        
-    @abstractmethod
-    def build_connection_string(self, config: Dict[str, Any]) -> Optional[str]:
-        """
-        Build connection string from config dictionary.
-        
-        Args:
-            config: Configuration dictionary with database settings
-            
-        Returns:
-            Connection string if successful, None otherwise
-        """
-        pass
-        
     def __enter__(self):
         """Context manager entry"""
         self.connect()
