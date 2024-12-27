@@ -1,0 +1,1270 @@
+[
+  {
+    "token_address": "0x5C122276BB4a73dDff58172bDFDb79BEa0b201d6",
+    "deployer": "0xDFaaA0A3478a685B0355Ab47287D8F55e39dCD07",
+    "total_addresses": 90,
+    "dev_count": 0,
+    "dev_related_count": 0,
+    "pair_count": 0,
+    "trader_count": 0,
+    "dex_count": 4,
+    "top_profits": [
+      {
+        "address": "0x35fc556d6f8675b26fdf1542e6e894100155b34e",
+        "total_profit_usd": 18614.546175280007,
+        "profit_breakdown": {
+          "0x0000000000000000000000000000000000000000": {
+            "symbol": "ETH",
+            "amount": 6.204848725093336,
+            "amount_usd": 18614.546175280007
+          }
+        },
+        "related_transactions": [
+          {
+            "hash": "0x5d69949ac11a169c8333f9de1bf8b4fb15237d4ac55b04f73cc4dd85957886e4",
+            "eth_change": 0.10646005642501409,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x6286c84286c69661da67498aee394509da871c34868f429140182a7c821e43dd",
+            "eth_change": 0.10492675685825811,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x7358e1342306a277b3e8c9dc2fb4c8c75c31af27301fd571c19a17881b51eacd",
+            "eth_change": 0.10342636177467843,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x173d7c6802ee76da5942a039fdbac4e3344a3b222171865f56c5e0160bd79203",
+            "eth_change": 0.1019579361306585,
+            "token_changes": {}
+          },
+          {
+            "hash": "0xfe65cb403678a5dfd23ad2a8bdcfc7abe30d50df2e16882b7116b2b827f89a14",
+            "eth_change": 0.10052057786687246,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x7bbbbaa3bf7bdd5ebd9927c1a5954d2a7311bb28194e128dc8b740d98763b891",
+            "eth_change": 0.09911341652168235,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x7fd1f316bd5f7ed42a9a494d3f2ebfcb99bb73a8f86cb84bd29324b7e050f2ac",
+            "eth_change": 0.0977356119120723,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x967e6a716532158bb983e504c73c708570d5292f690f3244b57c5a0c1a1f2c30",
+            "eth_change": 0.09638635287838587,
+            "token_changes": {}
+          },
+          {
+            "hash": "0xcde0094144907185d6c728f9f123e58ac2e581fb03cf5c693bfcb948815236fa",
+            "eth_change": 0.09506485608936374,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x782d3ef955183db8a139aa0846180b05fb1401c844ff8a8854396af722973a68",
+            "eth_change": 0.09377036490419342,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x6391802b950659779d12ca6606b72d4b6999422a8e96c852a457480428fa4566",
+            "eth_change": 0.09250214828848335,
+            "token_changes": {}
+          },
+          {
+            "hash": "0xa8dad71fc89ad29fda1fe6011fdd42c36e2f990aec59c276c01637d33d5492b5",
+            "eth_change": 0.0912594997812605,
+            "token_changes": {}
+          },
+          {
+            "hash": "0xec72340d8100b106deee41b6ef156c79d22a27c24288d3b96cff68253d862a6d",
+            "eth_change": 0.0900417365102648,
+            "token_changes": {}
+          },
+          {
+            "hash": "0xba074b3b355a1b6e7b4c96f5071d6d32fbeafae1b2b4132c49b8d875ffece479",
+            "eth_change": 0.08650530415531603,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x2913956b1429cbd07d4938a07c7f754b4f1bfb2caac2c58dd8f83149f19ef7dd",
+            "eth_change": 0.08423065828152757,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x69382bb954bc531bff31ef88c2d8b25424fc945234b89ceade544135a121b474",
+            "eth_change": 0.08660678122305727,
+            "token_changes": {}
+          },
+          {
+            "hash": "0xa89194233b5d680695408048c00b667747b2f74becbc692641d9edcfbaa78b7b",
+            "eth_change": 0.07674492032216837,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x75bb2f95a1bdf6792758fff16c95a47ec5bc14ed07f054cca9a032f6484ce816",
+            "eth_change": 0.07790407677248544,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x0fc1d0a1a3e47c38c9105daea4034c29f33f7394fec1ceb83ac52c08549f7bea",
+            "eth_change": 0.08348815751506627,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x230b6238dfda67066f0557753895e3e5091bada917175499a7ad0b136ce34a65",
+            "eth_change": 0.07807976772327822,
+            "token_changes": {}
+          },
+          {
+            "hash": "0xd0903ab704cb2e6d397acff1bb5f0458d3849c64df7a2a8e6b26ab48b684de6b",
+            "eth_change": 0.0814314441726466,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x2cafccd12a2a58476e27ca7326cf541e37cad0d95e8e05e4a100fa6cca0a15aa",
+            "eth_change": 0.08040452021951465,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x05be6039db58861f35fb6f33c6af7fc21acbfbe42db67ec23e0bd57d7eb49b71",
+            "eth_change": 0.07939690968686267,
+            "token_changes": {}
+          },
+          {
+            "hash": "0xfff88784ad5110f9c6b2e48637d4954045ba84897b471644a33323d5a84574f3",
+            "eth_change": 0.07840813116957349,
+            "token_changes": {}
+          },
+          {
+            "hash": "0xce617fe8d1b6e2dcae2feb1344244ad5d9cda7a2a598631e119f7415b519c7a1",
+            "eth_change": 0.0774377181711515,
+            "token_changes": {}
+          },
+          {
+            "hash": "0xe037d7ca8a62b122d56b401dc48018df53f99b3590041011ed1f12796f45ef07",
+            "eth_change": 0.06776552599780229,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x79980bfd8d707b3f52ae122cccc60abc4a377ecf4f3602f28c20186615460ba6",
+            "eth_change": 0.07565650191042238,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x553e404bed5e33fb89048a1116c83548242248b12ff9e52ab72cfb7602df6c67",
+            "eth_change": 0.07473659417412178,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x84770f731bb01c9756b7335f86664e62bfe9e24d9b4c079b65bd2fc51dafd6ff",
+            "eth_change": 0.07383337099636512,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x4cf960d1873c0afe846aa20c1438408ae482c97e9ba7cac86c6ef04d2416c86a",
+            "eth_change": 0.06817096365552,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x4fd38484d88f9ab7b40f7d0769fddc6468c6a8d2272d1b679796b32194e829e1",
+            "eth_change": 0.06307451600400134,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x4bdadd23774397bc0d8d52c436d5b8ef3d3ce3fa2aab5f98da7fa6127bed0110",
+            "eth_change": 0.07138298701188872,
+            "token_changes": {}
+          },
+          {
+            "hash": "0xce418295f9fd9e38240d617ebcb0fdeae4f67608bfef16e2f4f44eb9ff8f72db",
+            "eth_change": 0.0705397263786885,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x4f09136b34f0275b8bedbe87899f916c0727d5ec19dd61282637061338d49f4a",
+            "eth_change": 0.0601673306574685,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x8facd3be5459f44d7b132d844c58153ac6925054b8b163ded6494faea5a48305",
+            "eth_change": 0.06900858890862206,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x02dc13bf060d1d7f29211153f5924b9a3eebef6d03682e004dc92c457cc6b4f0",
+            "eth_change": 0.06205169483890869,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x8776882be70651a21728b0cf8b3efd47fde9a91b275895ee26da5d11787453c7",
+            "eth_change": 0.06749010955504708,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x5e6041911ccfb6abc5e0ad817d6397a6c3e652a8d388cb3ef400686344c505b9",
+            "eth_change": 0.15023403305498514,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x46988e23d8a1b645fea71f6d7c215dccb6e9d03d085b47c9e78b286a884a30ed",
+            "eth_change": 0.14766820195050198,
+            "token_changes": {}
+          },
+          {
+            "hash": "0xf68cfbd39b7e7e052e9a29f8d68276a79394b368af766071ce01e501736fbe58",
+            "eth_change": 0.14516757842403682,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x3f3f0f20013156913b36f9576fd1315a555d96dbd53e8b498566ddb39430db72",
+            "eth_change": 0.14272997094117426,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x151bc0e68db02f7916dca14dc553a2a1b4e92e3f8cba1f56b50684068c8133cc",
+            "eth_change": 0.14035327928147293,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x70014f99fb0c4104d22f41fe49b4e6683d07af33605e19cdde1000093b084d2c",
+            "eth_change": 0.13803549001006743,
+            "token_changes": {}
+          },
+          {
+            "hash": "0xe6615501c14bd4cbd3c521cdeed81287c36f659be4fc374e10e8ab8d5e89aa7a",
+            "eth_change": 0.13577467220913825,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x9b82c6ac65e1d9d7c9a9920fe357dbe65b2f37b53b186254bad743a131a91f11",
+            "eth_change": 0.13356897345234453,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x88ab3c238fc2a8fbaadc6cb02b1337a6cdf917d5b35df4459f95d91a963ac34f",
+            "eth_change": 0.22012646483716888,
+            "token_changes": {}
+          },
+          {
+            "hash": "0xd2af5ee042b783a8c6fc029d24b76f70300ee91b8d11ca6cf81127b840641f26",
+            "eth_change": 0.21773267624319495,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x4e2cea33a82a89e4d2311d1838cc24ef5ba4aa643eb9bbc8637eae7011b13692",
+            "eth_change": 0.21428323276102326,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x22c48f046c382278884da7d69dffb4e67c8b0c0e7c5e46ab7a4e82f60cfdf2a4",
+            "eth_change": 0.1,
+            "token_changes": {}
+          },
+          {
+            "hash": "0xa4ed0f7675de64505e429496882a00b7c21c26553c97ecc221eedccf0f093ed2",
+            "eth_change": 0.12416838063733711,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x41b7aad1c3c65dab1bc8b532c19425a9696a80f13a6a1886b46cc216037549fc",
+            "eth_change": 0.12803378341634086,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x48a036e3f673b12c4b7a7d60369dc39e31926ef04bacb2b382de7986fe7ee844",
+            "eth_change": 0.12601337414076502,
+            "token_changes": {}
+          },
+          {
+            "hash": "0xca6d21eff0348f855044983ea8e662b6f3cfec5eaaff0364c2ada87e3aa6c569",
+            "eth_change": 0.013877336494085438,
+            "token_changes": {}
+          },
+          {
+            "hash": "0xbb03154d50e4b4a4618afef0ec16035b78a380976b683fafc197c0a0f0249668",
+            "eth_change": 0.03442167048268011,
+            "token_changes": {}
+          },
+          {
+            "hash": "0xc09ea219463af946a5989a97f36b0f3fe40902a490537159f5133b15a034a2d0",
+            "eth_change": 0.03457316977541318,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x7de54ed9d42dc1a3b4227068226a64d8fde700e88301fd76bdec5cc4aae089c3",
+            "eth_change": 0.036669127682403775,
+            "token_changes": {}
+          },
+          {
+            "hash": "0xe7c56ef641cfaf7b1bbf7a766efbf8360c838fe037be2930f4e91f353a324122",
+            "eth_change": 0.03524648021291218,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x268a738acc5510455aa24ddcded391e640decae030271aab3f08676fb2e7238e",
+            "eth_change": 0.03284358475789413,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x18fc973c2a095f6e82a39d3bd902e4f0918567e81bcc0f0fa618daa2e882d31d",
+            "eth_change": 0.03299136863787391,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x8e985940501c9a92e1a87e131bf699fe873688df1b11aeb5c9eb16d977da267f",
+            "eth_change": 0.03535955025311615,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x85421cf8448745a29fd8c05fedb9e4389e1a24a70ebbd1f51110ef67ba6fcd7b",
+            "eth_change": 0.033634743144116186,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x66932005b6a4ffc6d6f6577c97e089b8c49154d6da40c53b5eb50595b2dc23ed",
+            "eth_change": 0.034528862493818244,
+            "token_changes": {}
+          },
+          {
+            "hash": "0xaeec290f99278e14f4d33572871e99eb67522899f6fbbaad4a5c35a0b78bdfd0",
+            "eth_change": 0.033569692793793175,
+            "token_changes": {}
+          },
+          {
+            "hash": "0xac833ba8c98078e313953576d85d13c75ed51d4a74f219f643358ddfdbf5c7da",
+            "eth_change": 0.222588859645676,
+            "token_changes": {}
+          },
+          {
+            "hash": "0xd13631ef9f04d87eb9a32d2d30d56b272779a2f509946d94122b0fef3a81ee00",
+            "eth_change": 0.2179721919173092,
+            "token_changes": {}
+          },
+          {
+            "hash": "0xe770df57e62c0ecf641668cb6a4975bb2a2557558fc0ac8a658f215cedca077c",
+            "eth_change": 0.05,
+            "token_changes": {}
+          },
+          {
+            "hash": "0x9818b27078a7e47573520f9f36eb74712b6891f6b0d340ebae28535cdab94c9f",
+            "eth_change": 0.025,
+            "token_changes": {}
+          }
+        ],
+        "is_dev": false,
+        "is_dev_related": false,
+        "is_pair": false,
+        "is_trader": false,
+        "is_dex": false
+      },
+      {
+        "address": "0x9a1beb61d085c5d366007ac2740107f526fb4b2d",
+        "total_profit_usd": 15757.881752117484,
+        "profit_breakdown": {
+          "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+            "symbol": "WETH",
+            "amount": 5.252627250705828,
+            "amount_usd": 15757.881752117484
+          }
+        },
+        "related_transactions": [
+          {
+            "hash": "0xc85be2b88c94ec9289f15869347dcdf285e90bdb589a200c138bf0fb8fae886c",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.07768337062336947,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x5d69949ac11a169c8333f9de1bf8b4fb15237d4ac55b04f73cc4dd85957886e4",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.1064600564250141,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x6286c84286c69661da67498aee394509da871c34868f429140182a7c821e43dd",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.10492675685825811,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x7358e1342306a277b3e8c9dc2fb4c8c75c31af27301fd571c19a17881b51eacd",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.10342636177467843,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x173d7c6802ee76da5942a039fdbac4e3344a3b222171865f56c5e0160bd79203",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.1019579361306585,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xfe65cb403678a5dfd23ad2a8bdcfc7abe30d50df2e16882b7116b2b827f89a14",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.10052057786687246,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x7bbbbaa3bf7bdd5ebd9927c1a5954d2a7311bb28194e128dc8b740d98763b891",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.09911341652168236,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x7fd1f316bd5f7ed42a9a494d3f2ebfcb99bb73a8f86cb84bd29324b7e050f2ac",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.0977356119120723,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x967e6a716532158bb983e504c73c708570d5292f690f3244b57c5a0c1a1f2c30",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.09638635287838587,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xcde0094144907185d6c728f9f123e58ac2e581fb03cf5c693bfcb948815236fa",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.09506485608936374,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x782d3ef955183db8a139aa0846180b05fb1401c844ff8a8854396af722973a68",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.09377036490419342,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x6391802b950659779d12ca6606b72d4b6999422a8e96c852a457480428fa4566",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.09250214828848337,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xa8dad71fc89ad29fda1fe6011fdd42c36e2f990aec59c276c01637d33d5492b5",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.0912594997812605,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xec72340d8100b106deee41b6ef156c79d22a27c24288d3b96cff68253d862a6d",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.09004173651026479,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xba074b3b355a1b6e7b4c96f5071d6d32fbeafae1b2b4132c49b8d875ffece479",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.08650530415531603,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x2913956b1429cbd07d4938a07c7f754b4f1bfb2caac2c58dd8f83149f19ef7dd",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.08423065828152757,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x69382bb954bc531bff31ef88c2d8b25424fc945234b89ceade544135a121b474",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.08660678122305727,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xa89194233b5d680695408048c00b667747b2f74becbc692641d9edcfbaa78b7b",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.07674492032216837,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x75bb2f95a1bdf6792758fff16c95a47ec5bc14ed07f054cca9a032f6484ce816",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.07790407677248544,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x0fc1d0a1a3e47c38c9105daea4034c29f33f7394fec1ceb83ac52c08549f7bea",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.08348815751506627,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x230b6238dfda67066f0557753895e3e5091bada917175499a7ad0b136ce34a65",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.07807976772327822,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xd0903ab704cb2e6d397acff1bb5f0458d3849c64df7a2a8e6b26ab48b684de6b",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.08143144417264658,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x2cafccd12a2a58476e27ca7326cf541e37cad0d95e8e05e4a100fa6cca0a15aa",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.08040452021951466,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x05be6039db58861f35fb6f33c6af7fc21acbfbe42db67ec23e0bd57d7eb49b71",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.07939690968686267,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xfff88784ad5110f9c6b2e48637d4954045ba84897b471644a33323d5a84574f3",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.07840813116957349,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xce617fe8d1b6e2dcae2feb1344244ad5d9cda7a2a598631e119f7415b519c7a1",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.0774377181711515,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xe037d7ca8a62b122d56b401dc48018df53f99b3590041011ed1f12796f45ef07",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.06776552599780229,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x79980bfd8d707b3f52ae122cccc60abc4a377ecf4f3602f28c20186615460ba6",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.07565650191042238,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x553e404bed5e33fb89048a1116c83548242248b12ff9e52ab72cfb7602df6c67",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.07473659417412176,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x84770f731bb01c9756b7335f86664e62bfe9e24d9b4c079b65bd2fc51dafd6ff",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.07383337099636512,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x4cf960d1873c0afe846aa20c1438408ae482c97e9ba7cac86c6ef04d2416c86a",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.06817096365552,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x4fd38484d88f9ab7b40f7d0769fddc6468c6a8d2272d1b679796b32194e829e1",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.06307451600400134,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x4bdadd23774397bc0d8d52c436d5b8ef3d3ce3fa2aab5f98da7fa6127bed0110",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.07138298701188872,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xce418295f9fd9e38240d617ebcb0fdeae4f67608bfef16e2f4f44eb9ff8f72db",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.0705397263786885,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x4f09136b34f0275b8bedbe87899f916c0727d5ec19dd61282637061338d49f4a",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.0601673306574685,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x8facd3be5459f44d7b132d844c58153ac6925054b8b163ded6494faea5a48305",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.06900858890862206,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x02dc13bf060d1d7f29211153f5924b9a3eebef6d03682e004dc92c457cc6b4f0",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.06205169483890868,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x8776882be70651a21728b0cf8b3efd47fde9a91b275895ee26da5d11787453c7",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.06749010955504708,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x1a09360600d9d43e82e92ebb931429b3c57d3c9e207c37a393c9d6652f41a6de",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.08319537358933836,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x521151af4e70377bcd03ca1390c28ee2f36d3af724ab376269abb19d44f1ff5b",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.05280337511515744,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x18a776cc132eb2033b9a8ee0bb46b9938c4cd7143c6e60bff9753200fb56916f",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.012911667087961936,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xfe7ffb4be26c337dddc68b7bd29edad7727bac3f964b902d293a25d6ad4bb653",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": 0.2,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xda994bb51ae6d0f85e0b22c1b08fb2fa9b88b0fa12e282d2f278f6a8596b2eb0",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": 0.5,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x5e6041911ccfb6abc5e0ad817d6397a6c3e652a8d388cb3ef400686344c505b9",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.15023403305498517,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x46988e23d8a1b645fea71f6d7c215dccb6e9d03d085b47c9e78b286a884a30ed",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.14766820195050198,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xf68cfbd39b7e7e052e9a29f8d68276a79394b368af766071ce01e501736fbe58",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.14516757842403685,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x3f3f0f20013156913b36f9576fd1315a555d96dbd53e8b498566ddb39430db72",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.14272997094117426,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x151bc0e68db02f7916dca14dc553a2a1b4e92e3f8cba1f56b50684068c8133cc",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.14035327928147293,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x70014f99fb0c4104d22f41fe49b4e6683d07af33605e19cdde1000093b084d2c",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.13803549001006743,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xe6615501c14bd4cbd3c521cdeed81287c36f659be4fc374e10e8ab8d5e89aa7a",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.13577467220913822,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x9b82c6ac65e1d9d7c9a9920fe357dbe65b2f37b53b186254bad743a131a91f11",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.13356897345234453,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x88ab3c238fc2a8fbaadc6cb02b1337a6cdf917d5b35df4459f95d91a963ac34f",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": 0.21903130829569045,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xd2af5ee042b783a8c6fc029d24b76f70300ee91b8d11ca6cf81127b840641f26",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.21773267624319495,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xb4e31aa1130308f79b7179861bfb7e6ef62f374a50d7a888546b3fb6b57afe68",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": 0.05,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x4e2cea33a82a89e4d2311d1838cc24ef5ba4aa643eb9bbc8637eae7011b13692",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.21428323276102326,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x22c48f046c382278884da7d69dffb4e67c8b0c0e7c5e46ab7a4e82f60cfdf2a4",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": 0.09950248756218906,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xbb186736f9349bd561fb2d902348ae15a6e357e6bc7be86b1e52588d09f56c4e",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": 0.187580170123833,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x63c2252cbb2aa87c64f836cea6b4029a5e205750b6e27a855341b5082e3d305b",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.057011625194489816,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xa4ed0f7675de64505e429496882a00b7c21c26553c97ecc221eedccf0f093ed2",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.1241683806373371,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xeab38e1a2d2f9a7a5aec9f1cb01beb26f6e4dbff3b1af7a342e8da7c42adcb77",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.03096380942548547,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x41b7aad1c3c65dab1bc8b532c19425a9696a80f13a6a1886b46cc216037549fc",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.12803378341634086,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x48a036e3f673b12c4b7a7d60369dc39e31926ef04bacb2b382de7986fe7ee844",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.12601337414076502,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xca6d21eff0348f855044983ea8e662b6f3cfec5eaaff0364c2ada87e3aa6c569",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.013877336494085438,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xb7d984ad14f01bfb1c852d1d375c57e5d9d69404bcd825953cf4ca3b7dbc7425",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.05282209965555689,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xbb03154d50e4b4a4618afef0ec16035b78a380976b683fafc197c0a0f0249668",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.03442167048268011,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xc09ea219463af946a5989a97f36b0f3fe40902a490537159f5133b15a034a2d0",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.03457316977541318,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x7de54ed9d42dc1a3b4227068226a64d8fde700e88301fd76bdec5cc4aae089c3",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.036669127682403775,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xe7c56ef641cfaf7b1bbf7a766efbf8360c838fe037be2930f4e91f353a324122",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.03524648021291218,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x268a738acc5510455aa24ddcded391e640decae030271aab3f08676fb2e7238e",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.03284358475789413,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x18fc973c2a095f6e82a39d3bd902e4f0918567e81bcc0f0fa618daa2e882d31d",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.03299136863787391,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x8e985940501c9a92e1a87e131bf699fe873688df1b11aeb5c9eb16d977da267f",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.03535955025311615,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x85421cf8448745a29fd8c05fedb9e4389e1a24a70ebbd1f51110ef67ba6fcd7b",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.033634743144116186,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x66932005b6a4ffc6d6f6577c97e089b8c49154d6da40c53b5eb50595b2dc23ed",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.034528862493818244,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xaeec290f99278e14f4d33572871e99eb67522899f6fbbaad4a5c35a0b78bdfd0",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.033569692793793175,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x43c64a3a7340d3b3c9beb3ba19f3a71156b17b4aeb13406f9c745336cc3868cb",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": 10.0,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xac833ba8c98078e313953576d85d13c75ed51d4a74f219f643358ddfdbf5c7da",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.222588859645676,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xd13631ef9f04d87eb9a32d2d30d56b272779a2f509946d94122b0fef3a81ee00",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": -0.21797219191730924,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xe770df57e62c0ecf641668cb6a4975bb2a2557558fc0ac8a658f215cedca077c",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": 0.04975124378109453,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0xe6ee7acb3e2bf322b556849ef4852e5ac4da4c79a5b2afdd68cac54f75ec72db",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": 0.099,
+                "symbol": "WETH"
+              }
+            }
+          },
+          {
+            "hash": "0x9818b27078a7e47573520f9f36eb74712b6891f6b0d340ebae28535cdab94c9f",
+            "eth_change": 0.0,
+            "token_changes": {
+              "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {
+                "amount": 0.02487562189054726,
+                "symbol": "WETH"
+              }
+            }
+          }
+        ],
+        "is_dev": false,
+        "is_dev_related": false,
+        "is_pair": false,
+        "is_trader": false,
+        "is_dex": false
+      },
+      {
+        "address": "0x46affe1b4f3fc41581fd20fbaf055daeab80a8b5",
+        "total_profit_usd": 2821.1506357169715,
+        "profit_breakdown": {
+          "0x0000000000000000000000000000000000000000": {
+            "symbol": "ETH",
+            "amount": 0.9403835452389905,
+            "amount_usd": 2821.1506357169715
+          }
+        },
+        "related_transactions": [
+          {
+            "hash": "0x521151af4e70377bcd03ca1390c28ee2f36d3af724ab376269abb19d44f1ff5b",
+            "eth_change": 0.05280337511515744,
+            "token_changes": {}
+          },
+          {
+            "hash": "0xfe7ffb4be26c337dddc68b7bd29edad7727bac3f964b902d293a25d6ad4bb653",
+            "eth_change": 0.2,
+            "token_changes": {}
+          },
+          {
+            "hash": "0xda994bb51ae6d0f85e0b22c1b08fb2fa9b88b0fa12e282d2f278f6a8596b2eb0",
+            "eth_change": 0.5,
+            "token_changes": {}
+          },
+          {
+            "hash": "0xbb186736f9349bd561fb2d902348ae15a6e357e6bc7be86b1e52588d09f56c4e",
+            "eth_change": 0.187580170123833,
+            "token_changes": {}
+          }
+        ],
+        "is_dev": false,
+        "is_dev_related": false,
+        "is_pair": false,
+        "is_trader": false,
+        "is_dex": false
+      },
+      {
+        "address": "0xcbd7375a4a5cf0cec831aa2b591bf47a0fb31ace",
+        "total_profit_usd": 661.0889131476578,
+        "profit_breakdown": {
+          "0x0000000000000000000000000000000000000000": {
+            "symbol": "ETH",
+            "amount": 0.22036297104921926,
+            "amount_usd": 661.0889131476578
+          }
+        },
+        "related_transactions": [
+          {
+            "hash": "0xac833ba8c98078e313953576d85d13c75ed51d4a74f219f643358ddfdbf5c7da",
+            "eth_change": 0.22036297104921926,
+            "token_changes": {}
+          }
+        ],
+        "is_dev": false,
+        "is_dev_related": false,
+        "is_pair": false,
+        "is_trader": false,
+        "is_dex": false
+      },
+      {
+        "address": "0xadcd8055a537a3b36c8f9d67e7395c441412208f",
+        "total_profit_usd": 647.3774099944084,
+        "profit_breakdown": {
+          "0x0000000000000000000000000000000000000000": {
+            "symbol": "ETH",
+            "amount": 0.21579246999813612,
+            "amount_usd": 647.3774099944084
+          }
+        },
+        "related_transactions": [
+          {
+            "hash": "0xd13631ef9f04d87eb9a32d2d30d56b272779a2f509946d94122b0fef3a81ee00",
+            "eth_change": 0.21579246999813612,
+            "token_changes": {}
+          }
+        ],
+        "is_dev": false,
+        "is_dev_related": false,
+        "is_pair": false,
+        "is_trader": false,
+        "is_dex": false
+      }
+    ],
+    "analyzed_at": "2024-12-26T07:16:25.226090"
+  }
+]

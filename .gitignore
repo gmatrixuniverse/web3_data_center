@@ -118,6 +118,9 @@ dmypy.json
 cython_debug/
 
 config.yml
+config_comp.yml
+config_home.yml
+logs_output.txt
 tokens.csv
 contracts.csv
 contract_metrics.csv

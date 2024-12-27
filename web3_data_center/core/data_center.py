@@ -1,5 +1,5 @@
 import asyncio
-from typing import Dict, List, Optional, Any
+from typing import Dict, List, Optional, Any, Union, Tuple
 from ..clients import *
 from ..models.token import Token
 from ..models.holder import Holder
@@ -13,10 +13,14 @@ from evm_decoder.utils.abi_utils import is_pair_swap
 from evm_decoder.utils.constants import UNI_V2_SWAP_TOPIC, UNI_V3_SWAP_TOPIC
 from evm_decoder import DecoderManager, AnalyzerManager, ContractManager
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
-from web3 import Web3
+from web3 import HTTPProvider, Web3
 import logging
+import random
 
 logger = logging.getLogger(__name__)
+
+
+TRANSFER_EVENT_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"
 
 class DataCenter:
     def __init__(self, config_path: str = "config.yml"):
@@ -35,6 +39,13 @@ class DataCenter:
         self.cache = {}
         
     def _get_client(self, client_type: str):
+        """Get a client instance of the specified type.
+        
+        Args:
+            client_type: Type of client to get ('opensearch', 'postgres', etc.)
+        """
+        if not hasattr(self, '_clients'):
+            self._clients = {}
         if client_type not in self._clients:
             if client_type == 'geckoterminal':
                 self._clients[client_type] = GeckoTerminalClient(config_path=self._config_path)
@@ -56,8 +67,6 @@ class DataCenter:
                 self._clients[client_type] = OpenSearchClient(config_path=self._config_path)
             elif client_type == 'funding':
                 self._clients[client_type] = FundingClient(config_path=self._config_path)
-            elif client_type == 'web3':
-                self._clients[client_type] = Web3(Web3.HTTPProvider("http://192.168.0.105:8545"))
             elif client_type == 'contract_manager':
                 self._clients[client_type] = ContractManager("http://192.168.0.105:8545")
             elif client_type == 'analyzer':
@@ -66,6 +75,11 @@ class DataCenter:
                 self._clients[client_type] = DecoderManager()
             elif client_type == 'label':
                 self._clients[client_type] = Web3LabelClient(config_path=self._config_path)
+            elif client_type == 'postgres':
+                from ..clients.database.postgresql_client import PostgreSQLClient
+                self._clients[client_type] = PostgreSQLClient(config_path=self._config_path, db_section='zju')
+            elif client_type == 'web3':
+                self._clients[client_type] = Web3(HTTPProvider("http://192.168.0.105:8545"))
         return self._clients[client_type]
     
     @property
@@ -127,6 +141,11 @@ class DataCenter:
     @property
     def label_client(self):
         return self._get_client('label')
+        
+    @property
+    def postgres_client(self):
+        """Get the PostgreSQL client for token metadata"""
+        return self._get_client('postgres')
         
     async def get_address_labels(self, addresses: List[str], chain_id: int = 0) -> List[Dict[str, Any]]:
         """Get labels for a list of addresses"""
@@ -363,6 +382,221 @@ class DataCenter:
         wallet_data = await self.gmgn_client.get_wallet_data(address, chain, period)
         self.cache[cache_key] = wallet_data
         return wallet_data
+
+    async def sample_transactions(
+        self,
+        single_block: Optional[Union[int, str]] = None,
+        block_range: Optional[Tuple[int, int]] = None,
+        sample_size: int = 100,
+        to_address_range: Optional[Tuple[str, str]] = None,
+        value_range: Optional[Tuple[int, int]] = None,
+        gas_range: Optional[Tuple[int, int]] = None,
+        four_bytes_list: Optional[List[str]] = None,
+        random_seed: Optional[int] = None,
+        full_transactions: int = 0
+    ) -> Union[List[str], List[Dict]]:
+        """Sample transactions from specified blocks.
+        
+        Args:
+            single_block: Single block to sample from
+            block_range: Range of blocks to sample from (inclusive)
+            sample_size: Number of transactions to sample
+            to_address_range: Range of 'to' addresses to filter
+            value_range: Range of transaction values to filter
+            gas_range: Range of gas used to filter
+            four_bytes_list: List of 4-byte function signatures to filter
+            random_seed: Random seed for reproducibility
+            full_transactions: Level of transaction detail to return:
+                0: Only transaction hashes
+                1: Transaction data without logs
+                2: Full transaction data with logs
+            
+        Returns:
+            List of transaction hashes if full_transactions=0,
+            otherwise list of transaction dictionaries
+        """
+        if random_seed is not None:
+            random.seed(random_seed)
+            
+        filtered_txs = []
+        
+        # If single block specified, use that
+        if single_block is not None:
+            filtered_txs.extend(
+                self._fetch_and_filter_block(
+                    block_identifier=single_block,
+                    to_addr_range=to_address_range,
+                    value_range=value_range,
+                    gas_range=gas_range,
+                    four_bytes_list=four_bytes_list,
+                    full_transactions=full_transactions
+                )
+            )
+            
+        # Otherwise use block range
+        elif block_range is not None:
+            start_block, end_block = block_range
+            
+            # Calculate how many blocks we need to sample to get enough transactions
+            # Assuming average of 200 transactions per block
+            avg_txs_per_block = 200
+            num_blocks_needed = max(1, sample_size // avg_txs_per_block * 2)  # Double for safety
+            
+            # Sample blocks within range
+            block_numbers = range(start_block, end_block + 1)
+            sampled_blocks = random.sample(block_numbers, min(num_blocks_needed, len(block_numbers)))
+            
+            # Fetch transactions from sampled blocks
+            for blk_num in sampled_blocks:
+                filtered_txs.extend(
+                    self._fetch_and_filter_block(
+                        block_identifier=blk_num,
+                        to_addr_range=to_address_range,
+                        value_range=value_range,
+                        gas_range=gas_range,
+                        four_bytes_list=four_bytes_list,
+                        full_transactions=full_transactions
+                    )
+                )
+                
+                # If we have enough transactions, stop sampling blocks
+                if len(filtered_txs) >= sample_size:
+                    break
+            
+            # If we still don't have enough transactions, sample more blocks
+            while len(filtered_txs) < sample_size:
+                # Sample a new block
+                remaining_blocks = set(block_numbers) - set(sampled_blocks)
+                if not remaining_blocks:
+                    break
+                    
+                new_block = random.choice(list(remaining_blocks))
+                sampled_blocks.append(new_block)
+                
+                filtered_txs.extend(
+                    self._fetch_and_filter_block(
+                        block_identifier=new_block,
+                        to_addr_range=to_address_range,
+                        value_range=value_range,
+                        gas_range=gas_range,
+                        four_bytes_list=four_bytes_list,
+                        full_transactions=full_transactions
+                    )
+                )
+        
+        # If we have more transactions than needed, randomly sample
+        if len(filtered_txs) > sample_size:
+            filtered_txs = random.sample(filtered_txs, sample_size)
+        # If we have fewer transactions than needed, raise an error
+        elif len(filtered_txs) < sample_size:
+            raise ValueError(f"Could not find {sample_size} transactions matching criteria. Only found {len(filtered_txs)}")
+            
+        return filtered_txs
+
+    def _fetch_and_filter_block(
+        self,
+        block_identifier: Union[int, str],
+        to_addr_range: Optional[Tuple[str, str]],
+        value_range: Optional[Tuple[int, int]],
+        gas_range: Optional[Tuple[int, int]],
+        four_bytes_list: Optional[List[str]],
+        full_transactions: int = 0
+    ) -> Union[List[str], List[Dict]]:
+        """
+        Fetch and filter transactions from a block based on criteria.
+        Returns either transaction hashes or transaction objects based on full_transactions parameter.
+
+        Args:
+            block_identifier: Block number or hash
+            to_addr_range: Range of 'to' addresses to filter
+            value_range: Range of transaction values to filter
+            gas_range: Range of gas used to filter
+            four_bytes_list: List of 4-byte function signatures to filter
+            full_transactions: Level of transaction detail to return:
+                0: Only transaction hashes
+                1: Transaction data without logs
+                2: Full transaction data with logs
+
+        Returns:
+            List of transaction hashes if full_transactions=0,
+            otherwise list of transaction dictionaries
+        """
+        block = self.w3_client.eth.get_block(block_identifier, full_transactions=True)
+        transactions = block.transactions
+
+        result = []
+        for tx in transactions:
+            if self._match_filters(
+                tx,
+                to_addr_range=to_addr_range,
+                value_range=value_range,
+                gas_range=gas_range,
+                four_bytes_list=four_bytes_list
+            ):
+                if full_transactions == 0:
+                    # Return only transaction hash
+                    result.append(tx.hash.hex())
+                elif full_transactions == 1:
+                    # Return transaction data without logs
+                    tx_dict = dict(tx)
+                    result.append(tx_dict)
+                else:  # full_transactions == 2
+                    # Return full transaction data with logs
+                    tx_dict = dict(tx)
+                    try:
+                        tx_receipt = self.w3_client.eth.get_transaction_receipt(tx.hash)
+                        tx_dict['receipt'] = dict(tx_receipt)
+                    except Exception as e:
+                        logger.warning(f"Failed to get receipt for tx {tx.hash.hex()}: {str(e)}")
+                    result.append(tx_dict)
+
+        return result
+
+    def _match_filters(
+        self,
+        tx: Dict,
+        to_addr_range: Optional[Tuple[str, str]],
+        value_range: Optional[Tuple[int, int]],
+        gas_range: Optional[Tuple[int, int]],
+        four_bytes_list: Optional[List[str]],
+    ) -> bool:
+        """
+        判断单笔交易 tx 是否满足所有过滤条件，满足则返回 True，否则 False。
+        """
+        # 1) to 地址过滤：基于字符串字典序比较
+        if to_addr_range and tx["to"] is not None:
+            start_to, end_to = to_addr_range
+            to_lower = tx["to"].lower()
+            if not (start_to.lower() <= to_lower <= end_to.lower()):
+                return False
+
+        # 2) value 范围过滤 (单位: Wei)
+        if value_range:
+            min_val, max_val = value_range
+            if not (min_val <= tx["value"] <= max_val):
+                return False
+
+        # 3) gas 范围过滤
+        if gas_range:
+            min_gas, max_gas = gas_range
+            if not (min_gas <= tx["gas"] <= max_gas):
+                return False
+
+        # 4) 4字节 (methodID) 过滤：交易 input 的前 4 字节
+        if four_bytes_list:
+            # 如果是简单转账，input 可能是 "0x"；做个保护
+            tx_input = tx.get("input", "0x")
+            if len(tx_input) < 10:  # 不含 methodID
+                return False
+
+            # 取 0x 后的前 8 个字符 => method_id
+            method_id = tx_input[0:10].lower()  # 例如 "0xa9059cbb"
+            # 对比 four_bytes_list 中是否有匹配
+            if method_id not in [m.lower() for m in four_bytes_list]:
+                return False
+
+        # 全部条件都符合
+        return True
 
     async def get_deployed_contracts(self, address: str, chain: str = 'eth') -> Optional[List[Dict[str, Any]]]:
         cache_key = f"deployed_contracts:{chain}:{address}"
@@ -655,6 +889,8 @@ class DataCenter:
             if chain_obj.chainId == 1:
                 # Use loop.run_in_executor for blocking Web3 calls
                 loop = asyncio.get_event_loop()
+                
+                # Get transactions and logs concurrently
                 logs = await loop.run_in_executor(None, lambda: self.w3_client.eth.get_logs({
                     'fromBlock': block_number,
                     'toBlock': block_number,
@@ -831,6 +1067,7 @@ class DataCenter:
 
     async def get_tx_by_log(self, log: Dict[str, Any], token_contract: str, chain: str = 'eth') -> Dict[str, Any]:
         try:
+            # logger.info(f"getting tx by log: {log}")
             tx = await self.get_tx_with_logs_by_hash(log['transactionHash'])
             return tx
         except Exception as e:
@@ -927,6 +1164,513 @@ class DataCenter:
             return None
 
 
+    async def get_balance_changes(self, tx_hash: str) -> Dict[str, Dict[str, Any]]:
+        """Get balance changes for ETH and tokens from transactions.
+        
+        Args:
+            tx_hashes: List of transaction hashes
+            
+        Returns:
+            Dict mapping address to their balance changes:
+            {
+                "address1": {
+                    "eth_change": int,
+                    "token_changes": {
+                        "token_address": {
+                            "amount": int,
+                            "symbol": str,
+                            "decimals": int
+                        }
+                    }
+                }
+            }
+        """
+        if not tx_hash:
+            return {}
+
+        return self.get_balance_changes_for_txs([tx_hash])
+
+    async def get_balance_changes_for_txs(self, tx_hashes: List[str]) -> Dict[str, Dict[str, Any]]:
+        """
+        Get balance changes for multiple transactions.
+        
+        Args:
+            tx_hashes: List of transaction hashes to analyze
+            
+        Returns:
+            Dict mapping transaction hash to its balance changes
+        """
+        if not tx_hashes:
+            return {}
+
+        # Process transactions in batches of 100
+        batch_size = 100
+        
+        for i in range(0, len(tx_hashes), batch_size):
+            batch_hashes = tx_hashes[i:i + batch_size]
+            logger.info(f"Processing batch {i//batch_size + 1} of {(len(tx_hashes) + batch_size - 1)//batch_size}")
+            
+            try:
+                # Use rate-limited search from OpenSearch client
+                results = await self.opensearch_client.search_transaction_batch(batch_hashes)
+            except Exception as e:
+                logger.error(f"Error searching transactions batch {i}-{i+batch_size}: {str(e)}")
+                continue
+
+            def _ensure_address(addr: str, changes: Dict):
+                """Ensure address exists in changes dict"""
+                if addr.lower() not in changes:
+                    changes[addr.lower()] = {
+                        'eth_change': 0,
+                        'token_changes': {}
+                    }
+
+            # Process each transaction in the batch
+            for hit in results["hits"]["hits"]:
+                for tx_hit in hit["inner_hits"]["Transactions"]["hits"]["hits"]:
+                    tx = tx_hit["_source"]
+                    tx_hash = tx["Hash"]
+                    tx_changes = {}
+                    
+                    # Skip failed transactions
+                    if not tx.get("Status", False):
+                        continue
+
+                    # Process ETH balance changes from BalanceWrite
+                    if "BalanceWrite" in tx:
+                        for balance_write in tx["BalanceWrite"]:
+                            address = balance_write["Address"].lower()
+                            prev = int(balance_write["Prev"]) if balance_write["Prev"] != "0x" else 0
+                            current = int(balance_write["Current"]) if balance_write["Current"] != "0x" else 0
+                            
+                            _ensure_address(address, tx_changes)
+                            tx_changes[address]['eth_change'] = current - prev
+
+                    # Process token balance changes from logs
+                    if "Logs" in tx:
+                        for log in tx["Logs"]:
+                            # Skip non-Transfer events
+                            if len(log.get("Topics", [])) != 3 or log["Topics"][0] != TRANSFER_EVENT_TOPIC:
+                                continue
+                                
+                            # Get token contract and addresses
+                            token_addr = log["Address"].lower()
+                            from_addr = "0x" + log["Topics"][1][-40:].lower()
+                            to_addr = "0x" + log["Topics"][2][-40:].lower()
+                            
+                            try:
+                                amount = int(log["Data"], 16)
+                            except ValueError:
+                                logger.warning(f"Failed to parse token amount from log data: {log['Data']}")
+                                continue
+
+                            # Get token metadata
+                            token_data = await self.get_token_metadata(token_addr)
+                            
+                            # From address loses tokens
+                            _ensure_address(from_addr, tx_changes)
+                            if token_addr not in tx_changes[from_addr]['token_changes']:
+                                tx_changes[from_addr]['token_changes'][token_addr] = {
+                                    'amount': 0,
+                                    'symbol': token_data['symbol'] if token_data else '???',
+                                    'decimals': token_data['decimals'] if token_data else 18
+                                }
+                            tx_changes[from_addr]['token_changes'][token_addr]['amount'] -= amount
+                            
+                            # To address gains tokens
+                            _ensure_address(to_addr, tx_changes)
+                            if token_addr not in tx_changes[to_addr]['token_changes']:
+                                tx_changes[to_addr]['token_changes'][token_addr] = {
+                                    'amount': 0,
+                                    'symbol': token_data['symbol'] if token_data else '???',
+                                    'decimals': token_data['decimals'] if token_data else 18
+                                }
+                            tx_changes[to_addr]['token_changes'][token_addr]['amount'] += amount
+                    
+                    all_changes[tx_hash] = tx_changes
+
+        return all_changes
+
+    async def aggregate_balance_changes(self, tx_hashes: List[str]) -> Dict[str, Dict[str, Any]]:
+        """Aggregate balance changes across multiple transactions.
+        
+        Args:
+            tx_hashes: List of transaction hashes to analyze
+            
+        Returns:
+            Dict mapping addresses to their aggregated changes and related transactions:
+            {
+                "address": {
+                    "eth_change": int,  # Total ETH change in wei
+                    "token_changes": {
+                        "token_address": {
+                            "amount": int,  # Total token amount change
+                            "symbol": str,  # Token symbol
+                            "decimals": int # Token decimals
+                        }
+                    },
+                    "transactions": [  # List of transactions affecting this address
+                        {
+                            "hash": str,  # Transaction hash
+                            "eth_change": int,  # ETH change in this tx
+                            "token_changes": {  # Token changes in this tx
+                                "token_address": {
+                                    "amount": int,
+                                    "symbol": str,
+                                    "decimals": int
+                                }
+                            }
+                        }
+                    ]
+                }
+            }
+        """
+        # Get individual transaction changes
+        tx_changes = await self.get_balance_changes_for_txs(tx_hashes)
+        
+        # Initialize aggregated changes
+        aggregated = {}
+        
+        # Process each transaction
+        for tx_hash, changes in tx_changes.items():
+            # Process each address in the transaction
+            for address, addr_changes in changes.items():
+                # Initialize address in aggregated if not exists
+                if address not in aggregated:
+                    aggregated[address] = {
+                        'eth_change': 0,
+                        'token_changes': {},
+                        'transactions': []
+                    }
+                
+                # Add ETH changes
+                aggregated[address]['eth_change'] += addr_changes['eth_change']
+                
+                # Add token changes
+                for token_addr, token_data in addr_changes.get('token_changes', {}).items():
+                    if token_addr not in aggregated[address]['token_changes']:
+                        aggregated[address]['token_changes'][token_addr] = {
+                            'amount': 0,
+                            'symbol': token_data['symbol'],
+                            'decimals': token_data['decimals']
+                        }
+                    aggregated[address]['token_changes'][token_addr]['amount'] += token_data['amount']
+                
+                # Add transaction to address history
+                aggregated[address]['transactions'].append({
+                    'hash': tx_hash,
+                    'eth_change': addr_changes['eth_change'],
+                    'token_changes': addr_changes.get('token_changes', {})
+                })
+        
+        return aggregated
+
+    async def get_txs_with_logs_at_block(self, block_number: int = -1, chain: str = 'eth') -> List[Dict[str, Any]]:
+        try:
+            chain_obj = get_chain_info(chain)
+            if chain_obj.chainId == 1:
+                # Use loop.run_in_executor for blocking Web3 calls
+                loop = asyncio.get_event_loop()
+                
+                # Get transactions and logs concurrently
+                block = await loop.run_in_executor(None, lambda: self.w3_client.eth.get_block(block_number, full_transactions=True))
+                logs = await loop.run_in_executor(None, lambda: self.w3_client.eth.get_logs({
+                    'fromBlock': block_number if block_number != -1 else "latest",
+                    'toBlock': block_number if block_number != -1 else "latest"
+                }))
+                
+                # Create a map of transaction hash to logs
+                tx_logs_map = {}
+                for log in logs:
+                    tx_hash = log['transactionHash'].hex() if isinstance(log['transactionHash'], bytes) else log['transactionHash']
+                    if tx_hash not in tx_logs_map:
+                        tx_logs_map[tx_hash] = []
+                    tx_logs_map[tx_hash].append(log)
+                
+                # Attach logs to their corresponding transactions
+                processed_txs = []
+                for tx in block['transactions']:
+                    tx_hash = tx['hash'].hex() if isinstance(tx['hash'], bytes) else tx['hash']
+                    processed_tx = dict(tx)
+                    processed_tx['logs'] = tx_logs_map.get(tx_hash, [])
+                    processed_txs.append(processed_tx)
+                
+                return processed_txs
+                
+            else:
+                raise ValueError(f"Unsupported chain: {chain}")
+        except Exception as e:
+            logger.error(f"Error in get_txs_with_logs_at_block: {str(e)}")
+            return []
+
+    async def get_latest_swap_txs(self, chain: str = 'ethereum') -> List[Dict[str, Any]]:
+        try:
+            chain_obj = get_chain_info(chain)
+            if chain_obj.chainId == 1:
+                # Use loop.run_in_executor for blocking Web3 calls
+                loop = asyncio.get_event_loop()
+                txs = await loop.run_in_executor(None, lambda: self.w3_client.eth.get_block("latest",full_transactions=True))
+                return txs
+
+            elif chain_obj.chainId == 137:
+                txs = await loop.run_in_executor(None, lambda: self.w3_client.eth.get_block("latest",full_transactions=True))
+                return txs
+
+            else:
+                raise ValueError(f"Unsupported chain: {chain}")
+                
+        except Exception as e:
+            logger.error(f"Error getting latest swap orders: {str(e)}")
+            return []
+
+    async def get_profit_ranking(self, tx_hashes: List[str]) -> List[Dict[str, Any]]:
+        """Calculate profit ranking for addresses involved in transactions.
+        Only considers ETH, WETH, USDC, USDT, and WBTC as profit sources.
+        Ranks by positive profits only, but includes negative profits at the end.
+        
+        Token prices:
+        - ETH/WETH: $3000
+        - USDC/USDT: $1
+        - WBTC: $100000
+        
+        Args:
+            tx_hashes: List of transaction hashes to analyze
+            
+        Returns:
+            List of dicts containing address and profit info, sorted by profit:
+            [
+                {
+                    "address": str,
+                    "total_profit_usd": float,
+                    "profit_breakdown": {
+                        "token_address": {
+                            "symbol": str,
+                            "amount": float,  # Token amount
+                            "amount_usd": float  # USD value
+                        }
+                    },
+                    "related_transactions": [  # List of transactions affecting this address
+                        {
+                            "hash": str,  # Transaction hash
+                            "eth_change": float,  # ETH change in this tx
+                            "token_changes": {  # Token changes in this tx
+                                "token_address": {
+                                    "amount": float,
+                                    "symbol": str
+                                }
+                            }
+                        }
+                    ]
+                }
+            ]
+        """
+        # Token addresses and prices
+        PROFIT_TOKENS = {
+            "0x0000000000000000000000000000000000000000": {  # ETH
+                "symbol": "ETH",
+                "price": 3000,
+                "decimals": 18
+            },
+            "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2": {  # WETH
+                "symbol": "WETH",
+                "price": 3000,
+                "decimals": 18
+            },
+            "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48": {  # USDC
+                "symbol": "USDC",
+                "price": 1,
+                "decimals": 6
+            },
+            "0xdac17f958d2ee523a2206206994597c13d831ec7": {  # USDT
+                "symbol": "USDT",
+                "price": 1,
+                "decimals": 6
+            },
+            "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599": {  # WBTC
+                "symbol": "WBTC",
+                "price": 100000,
+                "decimals": 8
+            }
+        }
+        
+        # Get aggregated changes
+        aggregated = await self.aggregate_balance_changes(tx_hashes)
+        
+        # Calculate profits for each address
+        profits = []
+        losses = []  # Track losses separately
+        for address, data in aggregated.items():
+            profit_info = {
+                "address": address,
+                "total_profit_usd": 0,
+                "profit_breakdown": {},
+                "related_transactions": []
+            }
+            
+            # Calculate ETH profit
+            eth_change = data['eth_change'] / 1e18  # Convert wei to ETH
+            if eth_change != 0:
+                eth_profit_usd = eth_change * PROFIT_TOKENS["0x0000000000000000000000000000000000000000"]["price"]
+                profit_info["profit_breakdown"]["0x0000000000000000000000000000000000000000"] = {
+                    "symbol": "ETH",
+                    "amount": eth_change,
+                    "amount_usd": eth_profit_usd
+                }
+                profit_info["total_profit_usd"] += eth_profit_usd
+            
+            # Calculate token profits
+            for token_addr, token_data in data.get('token_changes', {}).items():
+                if token_addr in PROFIT_TOKENS:
+                    token_info = PROFIT_TOKENS[token_addr]
+                    amount = token_data['amount'] / (10 ** token_info['decimals'])
+                    if amount != 0:
+                        profit_usd = amount * token_info['price']
+                        profit_info["profit_breakdown"][token_addr] = {
+                            "symbol": token_info["symbol"],
+                            "amount": amount,
+                            "amount_usd": profit_usd
+                        }
+                        profit_info["total_profit_usd"] += profit_usd
+            
+            # Add related transactions with normalized values
+            for tx in data.get('transactions', []):
+                tx_info = {
+                    "hash": tx['hash'],
+                    "eth_change": tx['eth_change'] / 1e18,  # Convert wei to ETH
+                    "token_changes": {}
+                }
+                
+                # Normalize token amounts in transaction
+                for token_addr, token_data in tx.get('token_changes', {}).items():
+                    if token_addr in PROFIT_TOKENS:
+                        token_info = PROFIT_TOKENS[token_addr]
+                        amount = token_data['amount'] / (10 ** token_info['decimals'])
+                        tx_info["token_changes"][token_addr] = {
+                            "amount": amount,
+                            "symbol": token_info["symbol"]
+                        }
+                
+                profit_info["related_transactions"].append(tx_info)
+            
+            if profit_info["total_profit_usd"] > 0:  # Positive profit
+                profits.append(profit_info)
+            elif profit_info["total_profit_usd"] < 0:  # Negative profit (loss)
+                losses.append(profit_info)
+        
+        # Sort profits by amount (descending) and losses by amount (ascending)
+        profits.sort(key=lambda x: x["total_profit_usd"], reverse=True)
+        losses.sort(key=lambda x: x["total_profit_usd"])
+        
+        # Return profits first, followed by losses
+        return profits + losses
+
+    async def get_token_transfer_txs(self, token_address: str) -> List[str]:
+        """Get all distinct transactions containing transfers of a specific token.
+        
+        Args:
+            token_address: The token contract address to look up
+            
+        Returns:
+            List[str]: List of unique transaction hashes that contain transfers of this token
+        """
+        try:
+            # Initialize PostgreSQL client
+            self._get_client('postgres')
+            
+            # Convert to checksum address
+            token_address = Web3.toChecksumAddress(token_address)
+            
+            # Query to get distinct transaction hashes
+            query = """
+                SELECT DISTINCT transaction_hash
+                FROM token_transfers
+                WHERE LOWER(token_address) = LOWER(%s)
+                ORDER BY transaction_hash;
+            """
+            
+            logger.info(f"Getting transactions for token: {token_address}")
+            result = self.postgres_client.execute_query(query, [token_address])
+            
+            if result:
+                tx_hashes = [row["transaction_hash"] for row in result]
+                logger.info(f"Found {len(tx_hashes)} transactions for token {token_address}")
+                return tx_hashes
+            
+            logger.warning(f"No transactions found for token: {token_address}")
+            return []
+            
+        except Exception as e:
+            logger.error(f"Error getting token transfer transactions: {str(e)}")
+            return []
+
+    async def get_token_deployer(self, token_address: str) -> Optional[str]:
+        """Get the deployer address of a token contract.
+        
+        Args:
+            token_address: Token contract address
+            
+        Returns:
+            Optional[str]: Deployer address if found, None otherwise
+        """
+        try:
+            # Get contract creation transaction
+            creation_tx = await self.opensearch_client.get_contract_creation_tx(token_address)
+            if creation_tx:
+                return creation_tx.get('FromAddress')
+            return None
+        except Exception as e:
+            logger.error(f"Error getting token deployer: {str(e)}")
+            return None
+            
+    async def get_token_pairs(self, token_address: str) -> List[Dict[str, Any]]:
+        """Get all trading pairs for a token.
+        
+        Args:
+            token_address: Token contract address
+            
+        Returns:
+            List[Dict[str, Any]]: List of pair info dictionaries
+        """
+        try:
+            # Try getting pairs from various sources
+            pairs = []
+            
+            # Try GeckoTerminal
+            gt_pairs = await self.geckoterminal_client.get_token_pairs(token_address)
+            if gt_pairs:
+                pairs.extend(gt_pairs)
+                
+            # Try DexScreener
+            ds_pairs = await self.dexscreener_client.get_token_pairs(token_address)
+            if ds_pairs:
+                pairs.extend(ds_pairs)
+                
+            return pairs
+        except Exception as e:
+            logger.error(f"Error getting token pairs: {str(e)}")
+            return []
+            
+    async def check_token_trader(self, token_address: str, wallet_address: str) -> bool:
+        """Check if an address has traded a specific token.
+        
+        Args:
+            token_address: Token contract address
+            wallet_address: Wallet address to check
+            
+        Returns:
+            bool: True if the address has traded the token, False otherwise
+        """
+        try:
+            # Query trading stats from OpenSearch
+            trading_stats = await self.opensearch_client.get_token_trading_stats(
+                token_address,
+                wallet_address
+            )
+            return bool(trading_stats)
+        except Exception as e:
+            logger.error(f"Error checking token trader: {str(e)}")
+            return False
+
     async def get_funder_address(self, address: str) -> Optional[str]:
         """
         Get the funder's address for a given address by:
@@ -1007,7 +1751,11 @@ class DataCenter:
                         # Fallback to transaction lookup
                         try:
                             loop = asyncio.get_event_loop()
-                            tx = await loop.run_in_executor(None, self.w3_client.eth.get_transaction, tx_hash)
+                            tx = await loop.run_in_executor(
+                                None,
+                                self.w3_client.eth.get_transaction,
+                                tx_hash
+                            )
                             if not tx:
                                 logger.error(f"No transaction found for hash {tx_hash}")
                                 funder_map[addr] = None
@@ -1089,14 +1837,15 @@ class DataCenter:
                             tree[addr] = None
                             continue
 
-                        # Try to get funder from API response first
+                        # Get funder address
                         next_funder = result_data.get('From')
-                        
                         if not next_funder:
-                            # Fallback to transaction lookup
                             try:
-                                loop = asyncio.get_event_loop()
-                                tx = await loop.run_in_executor(None, self.w3_client.eth.get_transaction, tx_hash)
+                                tx = await asyncio.get_event_loop().run_in_executor(
+                                    None,
+                                    self.w3_client.eth.get_transaction,
+                                    tx_hash
+                                )
                                 if not tx:
                                     logger.error(f"No transaction found for hash {tx_hash}")
                                     tree[addr] = None
@@ -1164,7 +1913,6 @@ class DataCenter:
             logger.error(f"Error in get_funder_tree: {str(e)}")
             return {addr: None for addr in addresses}
 
-    @file_cache(namespace="root_funder", ttl=3600*24)  # Cache for 24 hours
     async def get_root_funder(self, address: str, max_depth: int = 100) -> Optional[Dict[str, Any]]:
         """
         Get the root funder (the earliest funder with no further funding source) for a given address.
@@ -1348,7 +2096,7 @@ class DataCenter:
                     # Get labels for the batch
                     if self.label_client:
                         try:
-                            label_results = self._get_client('label').get_addresses_labels(pending_funders, chain_id=0)
+                            label_results = self._get_client('label').get_addresses_labels(pending_funders)
                             label_map = {
                                 result['address'].lower(): result 
                                 for result in label_results
@@ -1364,7 +2112,6 @@ class DataCenter:
                                 label_type = (label_info.get('type') or 'DEFAULT').upper()
                                 name_tag = (label_info.get('name_tag') or '').upper()
                                 is_cex = any(cex_term in label_type for cex_term in ['CEX', 'EXCHANGE'])
-                                entity = label_info.get('entity')
                                 # Add to path
                                 path.append({
                                     'address': funder,
@@ -1374,7 +2121,7 @@ class DataCenter:
                                     'label': label_info.get('label', 'Default'),
                                     'name_tag': name_tag,
                                     'type': label_type,
-                                    'entity': entity
+                                    'entity': label_info.get('entity')
                                 })
                                 
                                 # If this is a CEX and we should stop, prune the path and return
@@ -1408,7 +2155,7 @@ class DataCenter:
             if pending_funders:
                 if self.label_client:
                     try:
-                        label_results = self._get_client('label').get_addresses_labels(pending_funders, chain_id=0)
+                        label_results = self._get_client('label').get_addresses_labels(pending_funders)
                         label_map = {
                             result['address'].lower(): result 
                             for result in label_results
@@ -1422,7 +2169,6 @@ class DataCenter:
                             label_type = (label_info.get('type') or 'DEFAULT').upper()
                             name_tag = (label_info.get('name_tag') or '').upper()
                             is_cex = any(cex_term in label_type for cex_term in ['CEX', 'EXCHANGE'])
-                            
                             entity = label_info.get('entity')
                             
                             path.append({
@@ -1478,7 +2224,7 @@ class DataCenter:
             address1: First address to check
             address2: Second address to check
             max_depth: Maximum depth to search in each path (default: 20)
-            stop_at_cex: If True, stops traversing when a CEX/EXCHANGE is found (default: True)
+            stop_at_cex: If True, stops at first CEX found (default: True)
             
         Returns:
             Optional[Dict[str, Any]]: If a relationship is found, returns:
@@ -1636,32 +2382,30 @@ class DataCenter:
             logger.error(f"Error getting latest swap orders: {str(e)}")
             return []
 
-    @file_cache(namespace="contract_creator_tx", ttl=3600*24)  # Cache for 24 hours
-    async def get_contract_creator_tx(self, contract_address: str) -> Optional[str]:
-        """
-        Get the transaction hash that created a contract.
+    async def get_token_metadata(self, token_address: str) -> Optional[Dict[str, Any]]:
+        """Get token metadata from the database.
         
         Args:
-            contract_address: The contract address to look up
+            token_address: Token contract address
             
         Returns:
-            Optional[str]: The transaction hash that created the contract, or None if not found
+            Optional[Dict[str, Any]]: Token metadata if found, None otherwise
         """
-        return await self.opensearch_client.get_contract_creator_tx(contract_address)
-
-    @file_cache(namespace="contract_creator", ttl=3600*24)  # Cache for 24 hours
-    async def get_contract_creator(self, contract_address: str) -> Optional[str]:
-        """
-        Get the address that created a contract.
-        
-        Args:
-            contract_address: The contract address to look up
+        try:
+            client = self.postgres_client
+            query = """
+                SELECT symbol, decimals
+                FROM eth_tokens 
+                WHERE address = %s
+            """
+            result = client.execute_query(query, [token_address.lower()])
             
-        Returns:
-            Optional[str]: The address that created the contract, or None if not found
-        """
-        creator_tx = await self.get_contract_creator_tx(contract_address)
-        if creator_tx:
-            return self.w3_client.eth.get_transaction(creator_tx)['from']
-        else:
+            if result and len(result) > 0:
+                return {
+                    'symbol': result[0]['symbol'],
+                    'decimals': result[0]['decimals']
+                }
+            return None
+        except Exception as e:
+            logger.error(f"Error getting token metadata: {str(e)}")
             return None

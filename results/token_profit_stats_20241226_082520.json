@@ -1,0 +1,72 @@
+[
+  {
+    "token_address": "0x7dcf4527bdf7503b156f7824b0fc6b11304ed995",
+    "deployer": "0x7fd4e3f5464d19ae10f7df98f9bdbbd4f66ce532",
+    "classification_counts": {
+      "total_addresses": 45,
+      "developers": 0,
+      "developer_related": 0,
+      "pair_addresses": 0,
+      "traders": 32,
+      "dex_addresses": 4
+    },
+    "top_profits": [
+      {
+        "address": "0xdb5889e35e379ef0498aae126fc2cce1fbd23216",
+        "profit": 9274.026101942974,
+        "classifications": {
+          "is_dev": false,
+          "is_dev_related": false,
+          "is_pair": false,
+          "is_trader": false,
+          "is_dex": true
+        }
+      },
+      {
+        "address": "0x80a64c6d7f12c47b7c66c5b4e20e72bc1fcd5d9e",
+        "profit": 1387.558889558716,
+        "classifications": {
+          "is_dev": false,
+          "is_dev_related": false,
+          "is_pair": false,
+          "is_trader": false,
+          "is_dex": true
+        }
+      },
+      {
+        "address": "0x4962fd6af0c446760c9bb1b7a07b12109f461462",
+        "profit": 1090.2993997211936,
+        "classifications": {
+          "is_dev": false,
+          "is_dev_related": false,
+          "is_pair": false,
+          "is_trader": true,
+          "is_dex": false
+        }
+      },
+      {
+        "address": "0x8e60b43743177f82e5c8f5881c966122ca112902",
+        "profit": 1054.5412255094661,
+        "classifications": {
+          "is_dev": false,
+          "is_dev_related": false,
+          "is_pair": false,
+          "is_trader": true,
+          "is_dex": false
+        }
+      },
+      {
+        "address": "0x2bc0e862858ee897033e9c1413c705f7305ae125",
+        "profit": 751.4648373201002,
+        "classifications": {
+          "is_dev": false,
+          "is_dev_related": false,
+          "is_pair": false,
+          "is_trader": true,
+          "is_dex": false
+        }
+      }
+    ],
+    "analyzed_at": "2024-12-26T08:25:20.238388+00:00"
+  }
+]

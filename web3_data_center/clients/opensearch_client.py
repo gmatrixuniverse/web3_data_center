@@ -3,6 +3,7 @@ import asyncio
 import logging
 from urllib.parse import urlparse
 import traceback
+import time
 
 from opensearchpy import AsyncOpenSearch, OpenSearch,ConnectionTimeout, OpenSearchException, NotFoundError
 from tenacity import retry, stop_after_attempt, wait_exponential, retry_if_exception_type
@@ -25,6 +26,10 @@ class OpenSearchClient(BaseClient):
             verify_certs=True,
             timeout=self.config['api']['opensearch'].get('timeout', 120)
         )
+        self._last_request_time = 0
+        self._requests_per_second = 8
+        self._rate_limiter = asyncio.Semaphore(self._requests_per_second)
+        self._batch_size = 500
 
     async def __aenter__(self):
         """Async context manager entry"""
@@ -45,27 +50,50 @@ class OpenSearchClient(BaseClient):
             self.client = None
         await super().close()
 
-    async def test_connection(self) -> bool:
+    async def _rate_limited_search(self, **kwargs):
+        """
+        Execute a rate-limited search request.
+        Ensures we don't exceed the specified requests per second limit.
+        """
+        current_time = time.time()
+        time_since_last_request = current_time - self._last_request_time
+        
+        if time_since_last_request < 1.0 / self._requests_per_second:
+            await asyncio.sleep(1.0 / self._requests_per_second - time_since_last_request)
+        
         try:
-            info = await self.client.info()
-            # logger.info(f"Successfully connected to OpenSearch cluster: {info['cluster_name']}")
-            # logger.info(f"OpenSearch version: {info['version']['number']}")
-            return True
+            async with self._rate_limiter:
+                result = await self.client.search(**kwargs)
+            self._last_request_time = time.time()
+            return result
         except Exception as e:
-            logger.error(f"Failed to connect to OpenSearch: {e}")
-            return False
+            logger.error(f"Error in rate limited search: {str(e)}")
+            raise
 
-    async def check_index_exists(self, index: str) -> bool:
+    async def search(self, **kwargs):
+        """
+        Rate-limited search method that wraps the AsyncOpenSearch search method.
+        All parameters are passed directly to the underlying search method.
+        """
+        return await self._rate_limited_search(**kwargs)
+
+    async def _rate_limited_scroll(self, scroll_id: str, scroll: str = '2m') -> Dict:
+        """Rate-limited scroll operation"""
         try:
-            exists = await self.client.indices.exists(index=index)
-            if exists:
-                logger.info(f"Index '{index}' exists")
-            else:
-                logger.warning(f"Index '{index}' does not exist")
-            return exists
+            async with self._rate_limiter:
+                return await self.client.scroll(scroll_id=scroll_id, scroll=scroll)
         except Exception as e:
-            logger.error(f"Error checking index existence: {e}")
-            return False
+            logger.error(f"Error in rate limited scroll: {str(e)}")
+            raise
+
+    async def _rate_limited_clear_scroll(self, scroll_id: str) -> Dict:
+        """Rate-limited clear scroll operation"""
+        try:
+            async with self._rate_limiter:
+                return await self.client.clear_scroll(scroll_id=scroll_id)
+        except Exception as e:
+            logger.error(f"Error in rate limited clear scroll: {str(e)}")
+            raise
 
     @retry(
         stop=stop_after_attempt(5),
@@ -73,6 +101,98 @@ class OpenSearchClient(BaseClient):
         retry=retry_if_exception_type((ConnectionTimeout, OpenSearchException)),
         reraise=True
     )
+    async def search_transaction_batch(self, batch_hashes: List[str], index: str = "eth_block") -> Dict:
+        """
+        Search for a batch of transaction hashes with rate limiting and scroll support.
+        Uses parallel processing for better performance.
+        
+        Args:
+            batch_hashes: List of transaction hashes to search for
+            index: OpenSearch index to search in (default: "eth_block")
+            
+        Returns:
+            Dict containing the search results with all matching transactions
+        """
+        # Split hashes into smaller batches
+        batches = [batch_hashes[i:i + self._batch_size] for i in range(0, len(batch_hashes), self._batch_size)]
+        
+        # Process batches in parallel
+        tasks = []
+        for batch in batches:
+            tasks.append(self._search_batch(batch, index))
+        
+        # Wait for all batches to complete
+        batch_results = await asyncio.gather(*tasks)
+        
+        # Combine results
+        all_hits = []
+        for result in batch_results:
+            if result and 'hits' in result and 'hits' in result['hits']:
+                all_hits.extend(result['hits']['hits'])
+        
+        return {
+            'hits': {
+                'hits': all_hits,
+                'total': len(all_hits)
+            }
+        }
+
+    async def _search_batch(self, hashes: List[str], index: str) -> Dict:
+        """
+        Search for a single batch of transaction hashes efficiently.
+        
+        Args:
+            hashes: List of transaction hashes to search for
+            index: OpenSearch index to search in
+            
+        Returns:
+            Dict containing the search results for this batch
+        """
+        query = {
+            "size": len(hashes),
+            "_source": False,  # Don't fetch the _source field at all
+            "query": {
+                "nested": {
+                    "path": "Transactions",
+                    "query": {
+                        "terms": {
+                            "Transactions.Hash": hashes
+                        }
+                    },
+                    "inner_hits": {
+                        "_source": [
+                            "Transactions.Hash",
+                            "Transactions.FromAddress",
+                            "Transactions.ToAddress",
+                            "Transactions.Value",
+                            "Transactions.Status",
+                            "Transactions.Logs",
+                            "Transactions.CallFunction",
+                            "Transactions.CallParameter",
+                            "Transactions.BalanceWrite"
+                        ],
+                        "size": len(hashes)
+                    }
+                }
+            }
+        }
+
+        try:
+            # Direct search without scrolling
+            response = await self._rate_limited_search(index=index, body=query)
+            
+            # Return results directly
+            return {
+                'hits': {
+                    'hits': response['hits']['hits'],
+                    'total': len(response['hits']['hits'])
+                }
+            }
+
+        except Exception as e:
+            logger.error(f"Error searching transaction batch: {str(e)}")
+            return None
+
     async def search_logs(self, index: str, start_block: int, end_block: int, 
                           event_topics: List[str], size: int = 1000, address: Optional[str] = None) -> List[Dict[str, Any]]:
         query = self._build_query(start_block, end_block, event_topics, size, address)
@@ -84,7 +204,7 @@ class OpenSearchClient(BaseClient):
             hits = response['hits']['hits']
 
             while len(response['hits']['hits']) > 0:
-                response = await self.client.scroll(scroll_id=scroll_id, scroll='2m')
+                response = await self._rate_limited_scroll(scroll_id=scroll_id)
                 scroll_id = response['_scroll_id']
                 hits.extend(response['hits']['hits'])
 
@@ -97,7 +217,7 @@ class OpenSearchClient(BaseClient):
             raise
         finally:
             if 'scroll_id' in locals():
-                await self.client.clear_scroll(scroll_id=scroll_id)
+                await self._rate_limited_clear_scroll(scroll_id=scroll_id)
 
     @staticmethod
     def _build_query(start_block: int, end_block: int, event_topics: List[str], size: int, address: Optional[str] = None) -> Dict[str, Any]:
@@ -141,50 +261,6 @@ class OpenSearchClient(BaseClient):
             "sort": [{"Number": {"order": "asc"}}]
         }
 
-    @staticmethod
-    def _build_specific_txs_query(to_address: str, start_block: int, end_block: int, size: int) -> Dict[str, Any]:
-                return {
-        "query": {
-            "bool": {
-                "must": [
-                    {
-                        "range": {
-                            "Number": {
-                                "gte": start_block,
-                                "lte": end_block
-                            }
-                        }
-                    },
-                    {
-                        "nested": {
-                            "path": "Transactions",
-                            "query": {
-                                "term": {
-                                    "Transactions.ToAddress": to_address
-                                }
-                            },
-                            "inner_hits": {
-                                "size": 2000,
-                                "_source": True
-                            }
-                        }
-                    }
-                ]
-            }
-        },
-        "size": size,
-        "_source": ["Number", "Timestamp"],
-        "sort": [
-            {
-                "Number": {
-                    "order": "asc"
-                }
-            }
-        ]
-    }
-    
-
- 
     async def get_specific_txs(self, to_address: str, start_block: int, end_block: int, size: int = 1000, max_iterations: int = 1000000000) -> List[Dict[str, Any]]:
         query = self._build_specific_txs_query(to_address, start_block, end_block, size)
 
@@ -252,10 +328,10 @@ class OpenSearchClient(BaseClient):
                 if iteration_count >= max_iterations:
                     logger.warning(f"Reached maximum number of iterations ({max_iterations}) in get_specific_txs")
                     break
-                response = await self.client.scroll(scroll_id=scroll_id, scroll='2m')
+                response = await self._rate_limited_scroll(scroll_id=scroll_id)
                 scroll_id = response['_scroll_id']
 
-            await self.client.clear_scroll(scroll_id=scroll_id)
+            await self._rate_limited_clear_scroll(scroll_id=scroll_id)
             logger.info(f"Processed {total_hits} hits, retrieved {len(transactions)} matching transactions")
             return transactions
         except RequestError as e:
@@ -343,10 +419,10 @@ class OpenSearchClient(BaseClient):
                 if iteration_count >= max_iterations:
                     logger.warning(f"Reached maximum number of iterations ({max_iterations}) in get_specific_txs_batch")
                     break
-                response = await self.client.scroll(scroll_id=scroll_id, scroll='2m')
+                response = await self._rate_limited_scroll(scroll_id=scroll_id)
                 scroll_id = response['_scroll_id']
 
-            await self.client.clear_scroll(scroll_id=scroll_id)
+            await self._rate_limited_clear_scroll(scroll_id=scroll_id)
             logger.info(f"Processed {total_hits} hits in {iteration_count} iterations")
         except RequestError as e:
             logger.error(f"OpenSearch request error: {e}")
@@ -363,6 +439,50 @@ class OpenSearchClient(BaseClient):
             logger.error(f"Traceback: {traceback.format_exc()}")
             raise
 
+    @staticmethod
+    def _build_specific_txs_query(to_address: str, start_block: int, end_block: int, size: int) -> Dict[str, Any]:
+                return {
+        "query": {
+            "bool": {
+                "must": [
+                    {
+                        "range": {
+                            "Number": {
+                                "gte": start_block,
+                                "lte": end_block
+                            }
+                        }
+                    },
+                    {
+                        "nested": {
+                            "path": "Transactions",
+                            "query": {
+                                "term": {
+                                    "Transactions.ToAddress": to_address
+                                }
+                            },
+                            "inner_hits": {
+                                "size": 2000,
+                                "_source": True
+                            }
+                        }
+                    }
+                ]
+            }
+        },
+        "size": size,
+        "_source": ["Number", "Timestamp"],
+        "sort": [
+            {
+                "Number": {
+                    "order": "asc"
+                }
+            }
+        ]
+    }
+    
+
+ 
     async def get_eth_change_in(self, tx_hash):
         try:
             response = await self.client.get(index="eth_block", id=tx_hash)
@@ -416,12 +536,12 @@ class OpenSearchClient(BaseClient):
         query = self._build_blocks_brief_query(start_block, end_block, size)
         
         try:
-            response = await self.client.search(index="eth_block", body=query, scroll='2m')
+            response = await self._rate_limited_search(index="eth_block", body=query, scroll='2m')
             scroll_id = response['_scroll_id']
             hits = response['hits']['hits']
 
             while len(response['hits']['hits']) > 0:
-                response = await self.client.scroll(scroll_id=scroll_id, scroll='2m')
+                response = await self._rate_limited_scroll(scroll_id=scroll_id)
                 scroll_id = response['_scroll_id']
                 hits.extend(response['hits']['hits'])
 
@@ -452,7 +572,7 @@ class OpenSearchClient(BaseClient):
             raise
         finally:
             if 'scroll_id' in locals():
-                await self.client.clear_scroll(scroll_id=scroll_id)
+                await self._rate_limited_clear_scroll(scroll_id=scroll_id)
 
     @retry(
         stop=stop_after_attempt(3),

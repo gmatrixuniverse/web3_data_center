@@ -22,7 +22,7 @@ class BaseDatabaseClient(ABC):
         
         if config_path and not connection_string:
             self.connection_string = self._init_from_config(config_path)
-            
+        print(self.connection_string)
         if not self.connection_string:
             raise ValueError("Either config_path or connection_string must be provided")
             
